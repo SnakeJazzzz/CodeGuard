@@ -1,29 +1,25 @@
 # Core Dependencies
-Flask==3.0.0
-Werkzeug==3.0.1
+streamlit>=1.28.0
 
-# Database
-# SQLite is included with Python, no additional package needed
+# Data handling
+pandas>=2.0.0
 
 # Testing
-pytest==7.4.0
-pytest-cov==4.1.0
-pytest-mock==3.11.1
-pytest-benchmark==4.0.0
-pytest-xdist==3.3.1
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.1
+pytest-benchmark>=4.0.0
+pytest-xdist>=3.3.1
 
 # Code Quality
-black==23.7.0
-flake8==6.1.0
-mypy==1.5.1
-pylint==2.17.5
+black>=23.7.0
+flake8>=6.1.0
+mypy>=1.5.1
+pylint>=2.17.5
 
 # Type Hints
-types-Flask==1.1.6
-
-# Optional: Enhanced functionality
-python-dotenv==1.0.0  # Environment variable management
+types-setuptools>=68.0.0
 
 # Development tools
-ipython==8.14.0  # Enhanced Python shell
-ipdb==0.13.13    # Debugger
+ipython>=8.14.0
+ipdb>=0.13.13

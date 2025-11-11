@@ -6,7 +6,7 @@ Comprehensive test suite for the CodeGuard plagiarism detection system using pyt
 
 The test suite is organized into two main categories:
 - **Unit Tests**: Test individual components in isolation
-- **Integration Tests**: Test component interactions and workflows
+- **Integration Tests**: Test component interactions and complete workflows
 
 **Coverage Target**: ≥80% code coverage
 
@@ -26,8 +26,8 @@ tests/
 │   └── ...
 ├── integration/       # Integration tests for workflows
 │   ├── test_analysis_workflow.py
-│   ├── test_api_endpoints.py
 │   ├── test_batch_processing.py
+│   ├── test_detector_integration.py
 │   └── ...
 ├── fixtures/          # Test fixtures and sample data
 │   ├── sample_code/
@@ -148,10 +148,6 @@ def temp_upload_dir(tmp_path):
 @pytest.fixture
 def test_db():
     """Provide in-memory test database."""
-
-@pytest.fixture
-def flask_client():
-    """Provide Flask test client."""
 ```
 
 ## Test Categories
@@ -180,20 +176,14 @@ Test database operations:
 - Constraint enforcement
 - Query performance
 
-### Web Layer Tests (Integration)
-Test HTTP endpoints:
-- File upload validation
-- Batch processing workflow
-- Results retrieval
-- Error handling
-- JSON response format
-
-### End-to-End Tests (Integration)
+### Integration Tests
 Test complete workflows:
-- Upload → Analyze → Results
+- Upload → Analyze → Results (without Streamlit UI)
 - Multiple file pairs
 - Error recovery
 - Performance under load
+
+**Note**: Streamlit UI testing is optional for this academic project. Focus is on core algorithm testing.
 
 ## Test Data
 
@@ -208,7 +198,7 @@ Located in `tests/fixtures/sample_code/`:
 
 ### Validation Datasets
 
-Located in `validation-datasets/`:
+Located in `../validation-datasets/`:
 - `plagiarized/` - Known plagiarized pairs
 - `legitimate/` - Legitimate similar code
 - `obfuscated/` - Obfuscation attempts
@@ -269,13 +259,14 @@ pytest tests/ -m benchmark --benchmark-only
 Using `pytest-mock` for external dependencies:
 
 ```python
-def test_file_upload_error(mocker, flask_client):
+def test_file_upload_error(mocker):
     # Mock file save to simulate failure
-    mocker.patch('src.web.file_handler.save_file',
+    mocker.patch('src.utils.file_utils.save_file',
                  side_effect=IOError("Disk full"))
 
-    response = flask_client.post('/upload', data={...})
-    assert response.status_code == 500
+    # Test error handling
+    with pytest.raises(IOError):
+        save_uploaded_files(files)
 ```
 
 ## Code Coverage Goals
@@ -284,8 +275,8 @@ Target coverage by module:
 - Detectors: ≥90%
 - Voting System: ≥95%
 - Database Operations: ≥85%
-- Web Layer: ≥80%
 - Utilities: ≥90%
+- **Overall**: ≥80%
 
 ## Reporting
 
@@ -301,12 +292,41 @@ src/voting/voting_system.py            89      3    97%   112-114
 TOTAL                                 1234     89    93%
 ```
 
+## Testing Without UI
+
+Since the core detection logic is framework-independent, most tests don't require Streamlit:
+
+```python
+# Test detectors directly without UI
+def test_detector_pipeline():
+    # Arrange
+    source1 = read_sample_file('original.py')
+    source2 = read_sample_file('copied.py')
+
+    # Act
+    token_sim = TokenDetector().compare(source1, source2)
+    ast_sim = ASTDetector().compare(source1, source2)
+    hash_sim = HashDetector().compare(source1, source2)
+    result = VotingSystem().vote(token_sim, ast_sim, hash_sim)
+
+    # Assert
+    assert result['is_plagiarized'] is True
+```
+
 ## Dependencies
 
 ```
 pytest>=7.4.0
 pytest-cov>=4.1.0
-pytest-mock>=3.11.0
+pytest-mock>=3.11.1
 pytest-benchmark>=4.0.0
-pytest-xdist>=3.3.0  # Parallel execution
+pytest-xdist>=3.3.1  # Parallel execution
 ```
+
+## Notes
+
+- Focus testing on core algorithms (detectors, voting system)
+- Streamlit UI testing is optional for this academic project
+- Integration tests should test logic flow, not UI rendering
+- Use mocks to test error conditions
+- Maintain ≥80% coverage throughout development

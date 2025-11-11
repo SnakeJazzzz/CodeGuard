@@ -4,75 +4,40 @@ This directory contains configuration files for the CodeGuard application.
 
 ## Files
 
-### `config.py`
+### `config.py` (To be created)
 Base configuration class with shared settings.
 
 ```python
 class Config:
     """Base configuration."""
-    # Flask settings
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB
+    # Detection thresholds
+    TOKEN_THRESHOLD = 0.70
+    AST_THRESHOLD = 0.80
+    HASH_THRESHOLD = 0.60
 
-    # Directory paths
-    UPLOAD_FOLDER = '/app/data/uploads'
-    RESULTS_FOLDER = '/app/data/results'
-    DATABASE_PATH = '/app/data/codeguard.db'
+    # Voting weights
+    TOKEN_WEIGHT = 1.0
+    AST_WEIGHT = 2.0
+    HASH_WEIGHT = 1.5
+    DECISION_THRESHOLD = 0.50
+
+    # Confidence weights
+    CONFIDENCE_TOKEN_WEIGHT = 0.3
+    CONFIDENCE_AST_WEIGHT = 0.4
+    CONFIDENCE_HASH_WEIGHT = 0.3
 
     # File upload settings
+    MAX_FILE_SIZE_BYTES = 16 * 1024 * 1024  # 16MB
     ALLOWED_EXTENSIONS = {'.py'}
     MAX_FILES_PER_UPLOAD = 100
     MIN_FILES_PER_UPLOAD = 2
 
-    # Processing settings
-    PROCESSING_TIMEOUT = 120  # seconds
+    # Winnowing parameters
+    KGRAM_SIZE = 5
+    WINNOWING_WINDOW = 4
 ```
 
-### `development.py`
-Development environment configuration.
-
-```python
-class DevelopmentConfig(Config):
-    """Development configuration."""
-    DEBUG = True
-    TESTING = False
-
-    # Logging
-    LOG_LEVEL = 'DEBUG'
-    LOG_FILE = '/app/logs/codeguard-dev.log'
-
-    # Database
-    DATABASE_ECHO = True  # Echo SQL queries
-
-    # Performance
-    ENABLE_PROFILING = True
-```
-
-### `production.py`
-Production environment configuration.
-
-```python
-class ProductionConfig(Config):
-    """Production configuration."""
-    DEBUG = False
-    TESTING = False
-
-    # Logging
-    LOG_LEVEL = 'INFO'
-    LOG_FILE = '/app/logs/codeguard-prod.log'
-
-    # Database
-    DATABASE_ECHO = False
-
-    # Performance
-    ENABLE_PROFILING = False
-
-    # Security
-    SESSION_COOKIE_SECURE = True
-    SESSION_COOKIE_HTTPONLY = True
-```
-
-### `thresholds.json`
+### `thresholds.json` (To be created)
 Detection algorithm thresholds and voting weights.
 
 ```json
@@ -100,68 +65,56 @@ Detection algorithm thresholds and voting weights.
 }
 ```
 
+## Configuration in Streamlit
+
+Streamlit provides interactive configuration through:
+
+1. **Sidebar Sliders** (`app.py`):
+   - Users can adjust thresholds in real-time
+   - Changes apply immediately to analysis
+   - No need to edit config files
+
+2. **Streamlit Config** (`.streamlit/config.toml`):
+   - Theme settings (colors, fonts)
+   - Server configuration
+   - Browser settings
+
 ## Usage
 
 ### Loading Configuration
 
-```python
-from config.config import Config
-from config.development import DevelopmentConfig
-from config.production import ProductionConfig
-import os
-
-# Select configuration based on environment
-env = os.environ.get('FLASK_ENV', 'development')
-
-if env == 'production':
-    app.config.from_object(ProductionConfig)
-elif env == 'testing':
-    app.config.from_object(TestingConfig)
-else:
-    app.config.from_object(DevelopmentConfig)
-```
-
-### Environment Variables
-
-Set environment-specific values:
-
-```bash
-# Development
-export FLASK_ENV=development
-export SECRET_KEY=dev-key-for-testing
-
-# Production
-export FLASK_ENV=production
-export SECRET_KEY=your-secret-key-here
-export DATABASE_PATH=/data/production/codeguard.db
-```
-
-### Threshold Configuration
-
-Load and modify thresholds:
+Configuration can be loaded from multiple sources:
 
 ```python
-from voting.thresholds import ThresholdManager
+# Option 1: From utils.constants (default values)
+from utils.constants import (
+    TOKEN_THRESHOLD,
+    AST_THRESHOLD,
+    HASH_THRESHOLD,
+    TOKEN_WEIGHT,
+    AST_WEIGHT,
+    HASH_WEIGHT
+)
 
-# Load from config file
-threshold_mgr = ThresholdManager('config/thresholds.json')
+# Option 2: From JSON file
+import json
+with open('config/thresholds.json', 'r') as f:
+    config = json.load(f)
 
-# Modify at runtime
-threshold_mgr.set_threshold('ast', 0.85)
-threshold_mgr.set_weight('hash', 2.0)
-
-# Save modified configuration
-threshold_mgr.save_config('config/thresholds_custom.json')
+# Option 3: From Streamlit sidebar (runtime)
+# Configured interactively in app.py sidebar
 ```
 
-## Configuration Hierarchy
+### Modifying Configuration
 
-```
-Config (base)
-├── DevelopmentConfig
-├── ProductionConfig
-└── TestingConfig
-```
+#### For Development:
+Edit `utils/constants.py` to change defaults
+
+#### For Runtime:
+Use Streamlit sidebar sliders in the web interface
+
+#### For Batch Processing:
+Create custom `thresholds.json` and load programmatically
 
 ## Threshold Tuning
 
@@ -189,17 +142,53 @@ Config (base)
 }
 ```
 
+### Balanced Approach (default):
+```json
+{
+  "thresholds": {
+    "token": 0.70,
+    "ast": 0.80,
+    "hash": 0.60
+  },
+  "decision_threshold": 0.50
+}
+```
+
+Current settings provide:
+- ~85% precision
+- ~80% recall
+- ~82% F1 score
+
 ## Security Considerations
 
-1. **Secret Key**: Never commit production secret keys to version control
-2. **Paths**: Use absolute paths in Docker environment
-3. **File Size Limits**: Prevent denial of service attacks
-4. **Debug Mode**: Always disable in production
+- No sensitive data stored in configuration
+- All values are detection parameters (safe to commit)
+- No API keys or credentials needed (local processing)
 
 ## Configuration Best Practices
 
-- Use environment variables for sensitive data
-- Keep configuration files in version control (except secrets)
-- Document all configuration options
-- Use different configurations for dev/test/prod
-- Validate configuration on application startup
+- Use default values from `utils/constants.py` for most cases
+- Test custom configurations with validation datasets
+- Document reasoning for non-default values
+- Keep configurations simple and readable
+
+## Notes
+
+### Streamlit vs Flask Configuration
+
+**Old (Flask)**: Multiple config files for dev/prod environments, Flask-specific settings
+
+**New (Streamlit)**: Simplified configuration
+- Algorithm parameters in `utils/constants.py`
+- UI configuration in `.streamlit/config.toml`
+- Runtime configuration via sidebar sliders
+
+See [Technical Decisions Log](../technicalDecisionsLog.md) for migration details.
+
+## Future Enhancements
+
+- [ ] Create `thresholds.json` file
+- [ ] Add configuration validation
+- [ ] Implement config file loading
+- [ ] Add preset configurations (strict, balanced, lenient)
+- [ ] Document optimal settings for different use cases

@@ -1,8 +1,9 @@
 # CodeGuard - Code Plagiarism Detection System
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Streamlit](https://img.shields.io/badge/streamlit-1.28+-red.svg)](https://streamlit.io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Docker](https://img.shields.io/badge/docker-required-blue.svg)](https://www.docker.com/)
+[![Docker](https://img.shields.io/badge/docker-supported-blue.svg)](https://www.docker.com/)
 
 ## Overview
 
@@ -20,74 +21,174 @@ CodeGuard is an intelligent code plagiarism detection system designed to help ed
   - Hash detection: 1.5x weight (partial copies)
   - Token detection: 1.0x weight (baseline)
 
+- **Interactive Web Interface**: Built with Streamlit
+  - Drag-and-drop file upload
+  - Real-time analysis progress
+  - Interactive configuration sliders
+  - Visual results with metrics
+  - JSON export functionality
+
 - **Privacy-First**: Complete local processing, no external data transmission
 
-- **Easy Deployment**: Single-command Docker deployment across platforms
-
-- **User-Friendly**: Web interface with drag-and-drop upload and real-time progress
+- **Easy Deployment**: Multiple deployment options
+  - Streamlit Cloud (free, one-click)
+  - Docker (local or custom server)
+  - Local Python (development)
 
 ## Quick Start
 
-### Prerequisites
+### Option 1: Streamlit Cloud (Recommended for Testing)
 
-- Docker Engine 20.10+
-- Docker Compose 2.0+
-- 4GB RAM, 10GB disk space
+1. Fork this repository
+2. Go to [share.streamlit.io](https://share.streamlit.io)
+3. Deploy from your GitHub repository
+4. Access your app at: `https://[your-app-name].streamlit.app`
 
-### Installation
+### Option 2: Docker (Recommended for Production)
 
 ```bash
 # Clone the repository
 git clone https://github.com/yourusername/codeguard.git
 cd codeguard
 
-# Start CodeGuard
+# Start with Docker Compose
 docker-compose up
+
+# Access the application
+# Open browser to: http://localhost:8501
 ```
 
-Access the web interface at `http://localhost:5000`
+### Option 3: Local Python (Development)
 
-### Basic Usage
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/codeguard.git
+cd codeguard
 
-1. Open your browser to `http://localhost:5000`
-2. Drag and drop Python files (minimum 2 files)
-3. Click "Analyze for Plagiarism"
-4. Review results with confidence scores
-5. Download JSON report for records
+# Create virtual environment
+python3.11 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the application
+streamlit run app.py
+
+# Access the application
+# Browser will open automatically at http://localhost:8501
+```
+
+## Usage
+
+1. **Upload Files**
+   - Click "Browse files" or drag-and-drop Python (.py) files
+   - Minimum 2 files, maximum 100 files
+   - Each file maximum 16MB
+
+2. **Configure Detection (Optional)**
+   - Adjust thresholds in the sidebar
+   - Modify voting weights
+   - Change decision threshold
+
+3. **Analyze**
+   - Click "🔍 Analyze for Plagiarism"
+   - Wait for processing (typically <2 minutes for 50 files)
+
+4. **Review Results**
+   - Switch to "Results" tab
+   - View summary statistics
+   - Filter and sort comparisons
+   - Expand details for each pair
+   - Download JSON report
 
 ## Project Structure
 
 ```
 codeguard/
-├── src/                    # Source code
-│   ├── detectors/         # Detection algorithms
-│   ├── web/               # Flask web application
-│   ├── database/          # Database layer
-│   ├── voting/            # Voting system
-│   └── utils/             # Utility functions
-├── tests/                 # Test suite (pytest)
-│   ├── unit/              # Unit tests
-│   └── integration/       # Integration tests
-├── config/                # Configuration files
-├── docker/                # Docker configuration
-├── docs/                  # Documentation
-│   ├── api/               # API documentation
-│   ├── algorithms/        # Algorithm details
-│   └── user-guide/        # User guide
-├── data/                  # Runtime data
-│   ├── uploads/           # Temporary uploads
-│   └── results/           # Analysis results
-├── static/                # Web assets
-├── templates/             # Jinja2 templates
-├── scripts/               # Utility scripts
-└── validation-datasets/   # Test datasets
+├── app.py                      # Main Streamlit application
+├── Dockerfile                  # Docker configuration
+├── docker-compose.yml          # Docker Compose setup
+├── requirements.txt            # Python dependencies
+├── .streamlit/                 # Streamlit configuration
+│   └── config.toml
+├── src/                        # Source code
+│   ├── detectors/             # Detection algorithms
+│   │   ├── base_detector.py
+│   │   ├── token_detector.py
+│   │   ├── ast_detector.py
+│   │   └── hash_detector.py
+│   ├── voting/                # Voting system
+│   │   ├── voting_system.py
+│   │   ├── confidence_calculator.py
+│   │   └── thresholds.py
+│   ├── database/              # Database layer
+│   │   ├── models.py
+│   │   ├── operations.py
+│   │   └── connection.py
+│   └── utils/                 # Utility functions
+│       ├── file_utils.py
+│       ├── validation.py
+│       ├── logger.py
+│       └── constants.py
+├── tests/                      # Test suite
+│   ├── unit/                  # Unit tests
+│   └── integration/           # Integration tests
+├── config/                     # Configuration files
+├── docs/                       # Documentation
+│   ├── algorithms/            # Algorithm details
+│   └── user-guide/            # User guides
+├── data/                       # Runtime data
+│   ├── uploads/               # Temporary uploads
+│   └── results/               # Analysis results
+├── scripts/                    # Utility scripts
+└── validation-datasets/        # Test datasets
 ```
+
+## Detection Algorithms
+
+### Token-Based Detection (Weight: 1.0x)
+- Analyzes code at lexical level using Python's `tokenize` module
+- Calculates Jaccard and Cosine similarity
+- Fast processing (~5000 lines/second)
+- Effective for direct copying
+- Defeated by variable renaming
+
+### AST-Based Detection (Weight: 2.0x)
+- Parses code into Abstract Syntax Trees using `ast` module
+- Normalizes variable names, compares structure
+- Processing speed (~1000 lines/second)
+- Immune to variable renaming
+- Detects structural plagiarism
+
+### Hash-Based Detection (Weight: 1.5x)
+- Implements Winnowing algorithm (Schleimer et al., 2003)
+- Creates code fingerprints using k-grams (k=5)
+- Winnowing window size: 4
+- Processing speed (~3000 lines/second)
+- Detects partial and scattered copying
+
+## Voting System
+
+The weighted voting mechanism combines results from all three detectors:
+
+1. Each detector compares its similarity score against its threshold
+   - Token threshold: 0.70 (default)
+   - AST threshold: 0.80 (default)
+   - Hash threshold: 0.60 (default)
+
+2. If score > threshold, detector "votes" with its weight
+   - Total possible votes = 4.5 (1.0 + 2.0 + 1.5)
+
+3. Plagiarism flagged when weighted_votes / 4.5 ≥ 0.50 (50%)
+
+4. Confidence score = (0.3 × token) + (0.4 × AST) + (0.3 × hash)
 
 ## Success Metrics
 
-- **Precision**: ≥85%
-- **Recall**: ≥80%
-- **F1 Score**: ≥82%
+- **Precision**: ≥85% (minimize false positives)
+- **Recall**: ≥80% (catch most plagiarism)
+- **F1 Score**: ≥82% (balanced performance)
 - **False Positive Rate**: ≤10%
 - **Processing Speed**: <2 minutes for 50 files
 - **Test Coverage**: ≥80%
@@ -99,48 +200,136 @@ codeguard/
 ```bash
 # Create virtual environment
 python3.11 -m venv venv
-source venv/bin/activate  # or venv\Scripts\activate on Windows
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
-pip install -e .
 
-# Run tests
-pytest tests/ --cov=src --cov-report=html
+# Install in development mode
+pip install -e .
 ```
 
 ### Running Tests
 
 ```bash
-# All tests
-./scripts/run_tests.sh
+# Run all tests with coverage
+pytest tests/ --cov=src --cov-report=html
 
-# Unit tests only
+# Run unit tests only
 pytest tests/unit/
 
-# Integration tests
+# Run integration tests
 pytest tests/integration/
 
-# Coverage report
+# Run specific test
+pytest tests/unit/test_token_detector.py
+
+# Generate coverage report
 pytest --cov=src --cov-report=term-missing
+```
+
+### Code Quality
+
+```bash
+# Format code
+black src/ tests/ app.py
+
+# Check style
+flake8 src/ tests/ app.py
+
+# Type checking
+mypy src/
+
+# Linting
+pylint src/
+```
+
+### Running the Application Locally
+
+```bash
+# Development mode with auto-reload
+streamlit run app.py
+
+# Production mode
+streamlit run app.py --server.headless true
+```
+
+## Configuration
+
+### Detection Thresholds
+
+Edit `config/thresholds.json` or use the sidebar sliders:
+
+```json
+{
+  "thresholds": {
+    "token": 0.70,
+    "ast": 0.80,
+    "hash": 0.60
+  },
+  "weights": {
+    "token": 1.0,
+    "ast": 2.0,
+    "hash": 1.5
+  },
+  "decision_threshold": 0.50
+}
+```
+
+### Streamlit Configuration
+
+Edit `.streamlit/config.toml` for theme and server settings.
+
+## Deployment
+
+### Deploy to Streamlit Cloud
+
+1. Push code to GitHub
+2. Go to [share.streamlit.io](https://share.streamlit.io)
+3. Click "New app"
+4. Select your repository
+5. Set main file: `app.py`
+6. Click "Deploy"
+
+### Deploy with Docker
+
+```bash
+# Build image
+docker build -t codeguard:latest .
+
+# Run container
+docker run -p 8501:8501 codeguard:latest
+
+# Or use Docker Compose
+docker-compose up -d
 ```
 
 ## Documentation
 
-- [Installation Guide](docs/user-guide/installation.md)
-- [Quick Start Guide](docs/user-guide/quick-start.md)
-- [API Documentation](docs/api/endpoints.md)
-- [Algorithm Details](docs/algorithms/)
-- [Troubleshooting](docs/user-guide/troubleshooting.md)
+- [Algorithm Details](docs/algorithms/) - Detailed algorithm documentation
+- [User Guide](docs/user-guide/) - Complete user guide
+- [Technical Decisions Log](technicalDecisionsLog.md) - Architecture decisions
+- [CLAUDE.md](CLAUDE.md) - Developer guidance
+- Individual module documentation in each directory's README.md
 
 ## Technology Stack
 
 - **Language**: Python 3.11
-- **Web Framework**: Flask 3.0
+- **Web Framework**: Streamlit 1.28+
+- **UI**: Streamlit components (built-in)
 - **Database**: SQLite
 - **Containerization**: Docker + Docker Compose
 - **Testing**: pytest, pytest-cov
 - **Platform**: Cross-platform (Windows, Mac, Linux)
+
+## Performance Expectations
+
+| Files | Comparisons | Typical Time |
+|-------|-------------|--------------|
+| 10    | 45          | ~10 seconds  |
+| 25    | 300         | ~30 seconds  |
+| 50    | 1,225       | ~90 seconds  |
+| 100   | 4,950       | ~5 minutes   |
 
 ## Authors
 
@@ -148,6 +337,13 @@ pytest --cov=src --cov-report=term-missing
 - Roberto Castro Soto (A01640117)
 
 Instituto Tecnológico y de Estudios Superiores de Monterrey
+
+## Academic Project Information
+
+**Course**: Desarrollo de aplicaciones avanzadas de ciencias computacionales (TC3002B)
+**Institution**: Tecnológico de Monterrey
+**Semester**: Fall 2024
+**Project Type**: Algorithm Design Implementation
 
 ## License
 
@@ -157,11 +353,53 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - Winnowing algorithm: Schleimer, Wilkerson, and Aiken (2003)
 - Python AST module documentation
-- Flask and Docker communities
+- Python tokenize module documentation
+- Streamlit framework and community
+
+## Architecture Notes
+
+**Why Streamlit?**
+
+This project initially designed for Flask but migrated to Streamlit to:
+- Focus development time on core algorithms (project's learning objective)
+- Simplify deployment and maintenance
+- Reduce UI complexity (70% less code)
+- Enable faster iteration and testing
+
+See [technicalDecisionsLog.md](technicalDecisionsLog.md) for detailed rationale.
 
 ## Support
 
 For issues and questions:
 - Open an issue on GitHub
-- Consult the [troubleshooting guide](docs/user-guide/troubleshooting.md)
-- Review [API documentation](docs/api/endpoints.md)
+- Consult the documentation in `docs/`
+- Review [technicalDecisionsLog.md](technicalDecisionsLog.md)
+
+## Contributing
+
+This is an academic project. Contributions welcome after December 2024.
+
+1. Fork the repository
+2. Create feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open Pull Request
+
+## Roadmap
+
+- [x] Project planning and design
+- [x] Streamlit UI implementation
+- [ ] Token detector implementation
+- [ ] AST detector implementation
+- [ ] Hash detector (Winnowing) implementation
+- [ ] Voting system implementation
+- [ ] Database integration
+- [ ] Comprehensive testing (≥80% coverage)
+- [ ] Validation dataset testing
+- [ ] Documentation completion
+- [ ] Deployment to Streamlit Cloud
+- [ ] Project defense and presentation
+
+---
+
+**Note**: This project is under active development as part of an academic assignment. Core algorithm implementations are in progress.
