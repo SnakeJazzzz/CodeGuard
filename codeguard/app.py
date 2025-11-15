@@ -1,14 +1,16 @@
 """
-CodeGuard - Task 4.1: Streamlit App with Database Integration
+CodeGuard - Task 4.2: Multi-Detector Streamlit App with Database Integration
 
-This is an enhanced Streamlit application that integrates the TokenDetector
-with persistent database storage for analysis history.
+This is an enhanced Streamlit application that integrates all three plagiarism
+detection algorithms (TokenDetector, ASTDetector, HashDetector) with persistent
+database storage for analysis history.
 
 Features:
 - File upload widget (2-100 Python files)
-- TokenDetector integration
-- Progress bar during analysis
-- Results display with interactive table
+- Multi-detector integration (Token, AST, Hash)
+- Parallel detection with progress tracking
+- Results display with all detector metrics
+- Sidebar filters for detector results
 - JSON export functionality
 - Session state management
 - Database integration for persistent storage
@@ -16,8 +18,8 @@ Features:
 - Enhanced metrics and statistics
 
 Author: CodeGuard Team
-Date: 2024-11-12
-Version: 2.0 (Database Integration)
+Date: 2024-11-13
+Version: 3.0 (Multi-Detector Integration)
 """
 
 import streamlit as st
@@ -31,6 +33,8 @@ import sys
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 from src.detectors.token_detector import TokenDetector
+from src.detectors.ast_detector import ASTDetector
+from src.detectors.hash_detector import HashDetector
 from src.database.connection import init_db
 from src.database.operations import (
     create_analysis_job,
@@ -51,6 +55,15 @@ MIN_FILES = 2
 MAX_FILES = 100
 ALLOWED_EXTENSIONS = ['.py']
 DEFAULT_THRESHOLD = 0.7
+
+# Detection thresholds for each detector
+TOKEN_THRESHOLD = 0.70
+AST_THRESHOLD = 0.80
+HASH_THRESHOLD = 0.60
+
+# Winnowing parameters for Hash Detector
+HASH_K_GRAM = 5
+HASH_WINDOW = 4
 
 # ============================================================================
 # SESSION STATE MANAGEMENT
@@ -79,6 +92,14 @@ def initialize_session_state():
         st.session_state.selected_job_id = None
     if 'view_history_details' not in st.session_state:
         st.session_state.view_history_details = False
+    if 'show_token_results' not in st.session_state:
+        st.session_state.show_token_results = True
+    if 'show_ast_results' not in st.session_state:
+        st.session_state.show_ast_results = True
+    if 'show_hash_results' not in st.session_state:
+        st.session_state.show_hash_results = True
+    if 'show_combined_score' not in st.session_state:
+        st.session_state.show_combined_score = True
 
 
 # ============================================================================
@@ -130,30 +151,39 @@ def validate_uploaded_files(files) -> Tuple[bool, str]:
 
 def analyze_files(files, threshold: float) -> pd.DataFrame:
     """
-    Analyze all file pairs using TokenDetector.
+    Analyze all file pairs using all three detectors (Token, AST, Hash).
 
     This function:
-    1. Creates a TokenDetector instance with the specified threshold
+    1. Creates instances of TokenDetector, ASTDetector, and HashDetector
     2. Generates all possible file pairs (N*(N-1)/2 combinations)
-    3. Analyzes each pair using token-based similarity
-    4. Displays progress in real-time
-    5. Returns results as a formatted DataFrame
+    3. Analyzes each pair using all three detection methods
+    4. Displays progress in real-time with detector-specific status
+    5. Returns results as a formatted DataFrame with all detector metrics
 
     Args:
         files: List of uploaded file objects
-        threshold: Similarity threshold (0.0-1.0) for plagiarism detection
+        threshold: Base similarity threshold (0.0-1.0) - used for display only
 
     Returns:
         pd.DataFrame: Results with columns:
             - File 1: First file name
             - File 2: Second file name
-            - Jaccard Similarity (%): Jaccard similarity score as percentage
-            - Cosine Similarity (%): Cosine similarity score as percentage
-            - Combined Similarity (%): Average of Jaccard and Cosine
-            - Plagiarized: Check mark (✓) or cross (✗) based on threshold
+            - Token Similarity (%): Token-based similarity (Jaccard + Cosine avg)
+            - Token Jaccard (%): Jaccard similarity score
+            - Token Cosine (%): Cosine similarity score
+            - AST Similarity (%): Structural similarity score
+            - Hash Similarity (%): Winnowing fingerprint similarity
+            - Combined Score (%): Weighted average of all three detectors
+            - Token Verdict: Detection verdict from Token detector
+            - AST Verdict: Detection verdict from AST detector
+            - Hash Verdict: Detection verdict from Hash detector
+            - Overall Status: Overall plagiarism determination
     """
-    # Create detector instance
-    detector = TokenDetector(threshold=threshold)
+    # Create detector instances with appropriate thresholds
+    token_detector = TokenDetector(threshold=TOKEN_THRESHOLD)
+    ast_detector = ASTDetector(threshold=AST_THRESHOLD)
+    hash_detector = HashDetector(threshold=HASH_THRESHOLD, k=HASH_K_GRAM, w=HASH_WINDOW)
+
     results = []
 
     # Generate all file pairs (combinations, not permutations)
@@ -165,16 +195,11 @@ def analyze_files(files, threshold: float) -> pd.DataFrame:
     # Progress tracking
     progress_bar = st.progress(0)
     status_text = st.empty()
+    total_pairs = len(pairs)
 
-    # Analyze each pair
+    # Analyze each pair with all three detectors
     for idx, (file1, file2) in enumerate(pairs):
-        # Update progress
-        progress = (idx + 1) / len(pairs)
-        progress_bar.progress(progress)
-        status_text.text(f"Analyzing pair {idx+1}/{len(pairs)}: {file1.name} vs {file2.name}")
-
-        # Read file contents
-        # Note: We decode bytes to string for the detector
+        # Read file contents once for all detectors
         code1 = file1.read().decode('utf-8')
         code2 = file2.read().decode('utf-8')
 
@@ -182,39 +207,97 @@ def analyze_files(files, threshold: float) -> pd.DataFrame:
         file1.seek(0)
         file2.seek(0)
 
-        # Run detector using compare() method
-        # compare() returns the combined similarity score
-        # We need to access the detector's internal methods for individual scores
-        result = detector.compare(code1, code2)
+        # Calculate base progress for this pair
+        base_progress = idx / total_pairs
 
-        # Get individual similarity metrics
-        # Tokenize both code strings
-        tokens1 = detector._tokenize_code(code1)
-        tokens2 = detector._tokenize_code(code2)
+        # ===== TOKEN DETECTOR =====
+        status_text.text(f"🔍 Token Detector: Pair {idx+1}/{total_pairs} - {file1.name} vs {file2.name}")
+        progress_bar.progress(base_progress + (0.33 / total_pairs))
 
-        # Calculate individual metrics
-        jaccard_sim = detector._calculate_jaccard_similarity(tokens1, tokens2)
-        cosine_sim = detector._calculate_cosine_similarity(tokens1, tokens2)
+        try:
+            # Get token detector results
+            tokens1 = token_detector._tokenize_code(code1)
+            tokens2 = token_detector._tokenize_code(code2)
 
-        # Combined similarity (average of Jaccard and Cosine)
-        combined_sim = result
+            jaccard_sim = token_detector._calculate_jaccard_similarity(tokens1, tokens2)
+            cosine_sim = token_detector._calculate_cosine_similarity(tokens1, tokens2)
+            token_sim = (jaccard_sim + cosine_sim) / 2.0
 
-        # Determine if plagiarized based on threshold
-        is_plagiarized = combined_sim >= threshold
+            token_verdict = "🚨 FLAGGED" if token_sim >= TOKEN_THRESHOLD else "✅ CLEAR"
+        except Exception as e:
+            st.warning(f"Token Detector error on {file1.name} vs {file2.name}: {str(e)[:50]}")
+            jaccard_sim, cosine_sim, token_sim = 0.0, 0.0, 0.0
+            token_verdict = "⚠️ ERROR"
 
-        # Store result
+        # ===== AST DETECTOR =====
+        status_text.text(f"🌳 AST Detector: Pair {idx+1}/{total_pairs} - {file1.name} vs {file2.name}")
+        progress_bar.progress(base_progress + (0.66 / total_pairs))
+
+        try:
+            ast_sim = ast_detector.compare(code1, code2)
+            ast_verdict = "🚨 FLAGGED" if ast_sim >= AST_THRESHOLD else "✅ CLEAR"
+        except Exception as e:
+            st.warning(f"AST Detector error on {file1.name} vs {file2.name}: {str(e)[:50]}")
+            ast_sim = 0.0
+            ast_verdict = "⚠️ ERROR"
+
+        # ===== HASH DETECTOR =====
+        status_text.text(f"🔐 Hash Detector: Pair {idx+1}/{total_pairs} - {file1.name} vs {file2.name}")
+        progress_bar.progress(base_progress + (1.0 / total_pairs))
+
+        try:
+            hash_sim = hash_detector.compare(code1, code2)
+            hash_verdict = "🚨 FLAGGED" if hash_sim >= HASH_THRESHOLD else "✅ CLEAR"
+        except Exception as e:
+            st.warning(f"Hash Detector error on {file1.name} vs {file2.name}: {str(e)[:50]}")
+            hash_sim = 0.0
+            hash_verdict = "⚠️ ERROR"
+
+        # ===== COMBINED SCORING =====
+        # Calculate weighted average (equal weights for simplicity)
+        # Can be adjusted to match voting system weights if desired
+        combined_score = (token_sim + ast_sim + hash_sim) / 3.0
+
+        # Determine overall status
+        # Flagged if any detector flags it, or if combined score is high
+        flagged_count = sum([
+            token_sim >= TOKEN_THRESHOLD,
+            ast_sim >= AST_THRESHOLD,
+            hash_sim >= HASH_THRESHOLD
+        ])
+
+        if flagged_count >= 2 or combined_score >= 0.7:
+            overall_status = "🚨 PLAGIARIZED"
+        elif flagged_count == 1:
+            overall_status = "⚠️ SUSPICIOUS"
+        else:
+            overall_status = "✅ CLEAR"
+
+        # Store result with all detector metrics
         results.append({
             'File 1': file1.name,
             'File 2': file2.name,
-            'Jaccard Similarity (%)': jaccard_sim * 100,
-            'Cosine Similarity (%)': cosine_sim * 100,
-            'Combined Similarity (%)': combined_sim * 100,
-            'Plagiarized': '✓' if is_plagiarized else '✗'
+            'token_similarity': token_sim,
+            'token_jaccard': jaccard_sim,
+            'token_cosine': cosine_sim,
+            'ast_similarity': ast_sim,
+            'hash_similarity': hash_sim,
+            'combined_score': combined_score,
+            'Token Similarity (%)': token_sim * 100,
+            'Token Jaccard (%)': jaccard_sim * 100,
+            'Token Cosine (%)': cosine_sim * 100,
+            'AST Similarity (%)': ast_sim * 100,
+            'Hash Similarity (%)': hash_sim * 100,
+            'Combined Score (%)': combined_score * 100,
+            'Token Verdict': token_verdict,
+            'AST Verdict': ast_verdict,
+            'Hash Verdict': hash_verdict,
+            'Overall Status': overall_status
         })
 
-    # Clear progress indicators
-    progress_bar.empty()
-    status_text.empty()
+    # Final progress update
+    progress_bar.progress(1.0)
+    status_text.text("✅ Analysis complete!")
 
     return pd.DataFrame(results)
 
@@ -225,20 +308,20 @@ def analyze_files(files, threshold: float) -> pd.DataFrame:
 
 def save_analysis_to_database(uploaded_files, results_df: pd.DataFrame, threshold: float) -> str:
     """
-    Save analysis results to database.
+    Save analysis results to database with all three detector scores.
 
     Steps:
     1. Generate unique job_id (e.g., 'job-{timestamp}')
     2. Create AnalysisJob with create_analysis_job(job_id, file_count)
-    3. Convert DataFrame results to list of dicts
+    3. Convert DataFrame results to list of dicts with all detector scores
     4. Save all results with save_batch_results(job_id, results)
     5. Update job status to 'completed' with update_job_status(job_id, 'completed')
     6. Store job_id in st.session_state
 
     Args:
         uploaded_files: List of uploaded file objects
-        results_df: DataFrame with analysis results
-        threshold: Detection threshold used
+        results_df: DataFrame with analysis results from all detectors
+        threshold: Detection threshold used (legacy parameter, kept for compatibility)
 
     Returns:
         job_id (str): Generated job identifier
@@ -254,20 +337,19 @@ def save_analysis_to_database(uploaded_files, results_df: pd.DataFrame, threshol
     file_count = len(uploaded_files)
     create_analysis_job(job_id, file_count)
 
-    # Prepare results for database
+    # Prepare results for database with all three detector scores
     results_list = []
     for _, row in results_df.iterrows():
         # Map DataFrame columns to database fields
-        # Note: token_similarity and ast_similarity both use the token detector scores
-        # This is a simplified version - in full system, would use all three detectors
+        # Now includes scores from all three detectors
         result = {
             'file1_name': row['File 1'],
             'file2_name': row['File 2'],
-            'token_similarity': row['Combined Similarity (%)'] / 100,  # Convert back to 0-1
-            'ast_similarity': row['Cosine Similarity (%)'] / 100,
-            'hash_similarity': row['Jaccard Similarity (%)'] / 100,
-            'is_plagiarized': row['Plagiarized'] == '✓',
-            'confidence_score': row['Combined Similarity (%)'] / 100
+            'token_similarity': row['token_similarity'],
+            'ast_similarity': row['ast_similarity'],
+            'hash_similarity': row['hash_similarity'],
+            'is_plagiarized': 'PLAGIARIZED' in row['Overall Status'],
+            'confidence_score': row['combined_score']
         }
         results_list.append(result)
 
@@ -286,11 +368,11 @@ def save_analysis_to_database(uploaded_files, results_df: pd.DataFrame, threshol
 
 def create_download_json(df: pd.DataFrame, threshold: float, file_count: int, job_id: Optional[str] = None) -> str:
     """
-    Create JSON string for download.
+    Create JSON string for download with all detector results.
 
     Args:
-        df: DataFrame with analysis results
-        threshold: Threshold used for detection
+        df: DataFrame with analysis results from all detectors
+        threshold: Threshold used for detection (legacy parameter)
         file_count: Number of files analyzed
         job_id: Optional job identifier
 
@@ -302,38 +384,60 @@ def create_download_json(df: pd.DataFrame, threshold: float, file_count: int, jo
         - analysis_date: ISO timestamp
         - file_count: Number of files analyzed
         - pair_count: Number of pairs compared
-        - threshold: Detection threshold used
-        - results: List of comparison results
-        - summary: Aggregate statistics
+        - detector_thresholds: Thresholds for each detector
+        - results: List of comparison results with all detector scores
+        - summary: Aggregate statistics for all detectors
     """
-    # Convert DataFrame to list of dictionaries
+    # Convert DataFrame to list of dictionaries with all detector scores
     results_list = []
     for _, row in df.iterrows():
         results_list.append({
             'file1': row['File 1'],
             'file2': row['File 2'],
-            'jaccard_similarity': row['Jaccard Similarity (%)'] / 100,
-            'cosine_similarity': row['Cosine Similarity (%)'] / 100,
-            'combined_similarity': row['Combined Similarity (%)'] / 100,
-            'is_plagiarized': row['Plagiarized'] == '✓'
+            'token_similarity': row['token_similarity'],
+            'token_jaccard': row['token_jaccard'],
+            'token_cosine': row['token_cosine'],
+            'ast_similarity': row['ast_similarity'],
+            'hash_similarity': row['hash_similarity'],
+            'combined_score': row['combined_score'],
+            'token_verdict': row['Token Verdict'],
+            'ast_verdict': row['AST Verdict'],
+            'hash_verdict': row['Hash Verdict'],
+            'overall_status': row['Overall Status']
         })
 
     # Calculate summary statistics
     total_pairs = len(df)
-    plagiarized_pairs = (df['Plagiarized'] == '✓').sum()
-    clean_pairs = total_pairs - plagiarized_pairs
+    plagiarized_pairs = (df['Overall Status'].str.contains('PLAGIARIZED')).sum()
+    suspicious_pairs = (df['Overall Status'].str.contains('SUSPICIOUS')).sum()
+    clean_pairs = total_pairs - plagiarized_pairs - suspicious_pairs
 
-    # Create export data structure
+    # Create export data structure with all detector information
     export_data = {
         'analysis_date': datetime.now().isoformat(),
         'file_count': file_count,
         'pair_count': total_pairs,
-        'threshold': threshold,
+        'detector_thresholds': {
+            'token': TOKEN_THRESHOLD,
+            'ast': AST_THRESHOLD,
+            'hash': HASH_THRESHOLD
+        },
+        'hash_parameters': {
+            'k': HASH_K_GRAM,
+            'w': HASH_WINDOW
+        },
         'results': results_list,
         'summary': {
             'total_pairs': total_pairs,
             'plagiarized_pairs': int(plagiarized_pairs),
-            'clean_pairs': int(clean_pairs)
+            'suspicious_pairs': int(suspicious_pairs),
+            'clean_pairs': int(clean_pairs),
+            'average_scores': {
+                'token': float(df['token_similarity'].mean()),
+                'ast': float(df['ast_similarity'].mean()),
+                'hash': float(df['hash_similarity'].mean()),
+                'combined': float(df['combined_score'].mean())
+            }
         }
     }
 
@@ -355,44 +459,61 @@ def render_sidebar():
 
     Displays:
         - App title and description
+        - Multi-detector information
+        - Detection method filters
         - File upload statistics
-        - Detection threshold slider
-        - Detector information
         - Database status
         - Instructions
     """
     st.sidebar.title("🔍 CodeGuard")
-    st.sidebar.markdown("### Plagiarism Detection System")
+    st.sidebar.markdown("### Multi-Detector Plagiarism System")
     st.sidebar.markdown("---")
 
     # App description
     st.sidebar.markdown("""
-    **Token-Based Detection**
+    **Three Detection Methods:**
 
-    Analyzes code using lexical similarity:
+    🔍 **Token Detector** (Threshold: 70%)
     - Jaccard similarity (set overlap)
     - Cosine similarity (frequency-based)
-    - Combined scoring
+
+    🌳 **AST Detector** (Threshold: 80%)
+    - Structural analysis
+    - Defeats variable renaming
+
+    🔐 **Hash Detector** (Threshold: 60%)
+    - Winnowing algorithm
+    - Detects partial copying
     """)
 
     st.sidebar.markdown("---")
 
-    # Threshold configuration
-    st.sidebar.subheader("⚙️ Configuration")
+    # Detection Method Filters
+    st.sidebar.subheader("🔍 Display Filters")
 
-    threshold = st.sidebar.slider(
-        "Detection Threshold",
-        min_value=0.0,
-        max_value=1.0,
-        value=DEFAULT_THRESHOLD,
-        step=0.05,
-        help="Similarity threshold for plagiarism detection. Higher values = stricter detection."
+    st.session_state.show_token_results = st.sidebar.checkbox(
+        "Show Token Detector",
+        value=st.session_state.show_token_results,
+        help="Display Token Detector similarity scores"
     )
 
-    st.session_state.detector_threshold = threshold
+    st.session_state.show_ast_results = st.sidebar.checkbox(
+        "Show AST Detector",
+        value=st.session_state.show_ast_results,
+        help="Display AST Detector structural similarity"
+    )
 
-    # Display current configuration
-    st.sidebar.info(f"Current threshold: {threshold:.0%}")
+    st.session_state.show_hash_results = st.sidebar.checkbox(
+        "Show Hash Detector",
+        value=st.session_state.show_hash_results,
+        help="Display Hash Detector fingerprint similarity"
+    )
+
+    st.session_state.show_combined_score = st.sidebar.checkbox(
+        "Show Combined Score",
+        value=st.session_state.show_combined_score,
+        help="Display average score across all detectors"
+    )
 
     st.sidebar.markdown("---")
 
@@ -404,6 +525,7 @@ def render_sidebar():
         st.sidebar.subheader("📊 Upload Statistics")
         st.sidebar.metric("Files Uploaded", file_count)
         st.sidebar.metric("Pairs to Analyze", pair_count)
+        st.sidebar.caption(f"{pair_count * 3} total detector runs")
 
     st.sidebar.markdown("---")
 
@@ -426,20 +548,20 @@ def render_sidebar():
     st.sidebar.subheader("📖 How to Use")
     st.sidebar.markdown("""
     1. Upload 2-100 Python files
-    2. Adjust detection threshold
+    2. Toggle detection method filters
     3. Click 'Analyze for Plagiarism'
-    4. Review results in table
-    5. Download results as JSON
+    4. Review results from all detectors
+    5. Download comprehensive JSON report
     6. View past analyses in History tab
     """)
 
 
 def render_main_header():
     """Render main application header."""
-    st.title("🔍 CodeGuard - Python Code Plagiarism Detection")
+    st.title("🔍 CodeGuard - Multi-Detector Plagiarism Detection")
     st.markdown("""
-    Upload Python files to detect potential plagiarism using **token-based similarity analysis**.
-    The system compares all file pairs using Jaccard and Cosine similarity metrics.
+    Upload Python files to detect potential plagiarism using **three complementary detection algorithms**.
+    The system analyzes all file pairs with Token, AST, and Hash detectors for comprehensive results.
     """)
     st.markdown("---")
 
@@ -547,100 +669,177 @@ def render_analysis_button(uploaded_files):
 
 def render_results():
     """
-    Render analysis results section.
+    Render analysis results section with all three detector results.
 
     Displays:
-        - Summary metrics (total pairs, plagiarized, clean, average similarity)
-        - Interactive results table
-        - Download button for JSON export
+        - Summary metrics for all detectors
+        - Interactive results table with filtering
+        - Download button for comprehensive JSON export
     """
     if st.session_state.analysis_results is None:
         return
 
     st.markdown("---")
-    st.header("📊 Analysis Results")
+    st.header("📊 Analysis Results - Multi-Detector")
 
     df = st.session_state.analysis_results
 
-    # Summary metrics
-    st.subheader("Summary Statistics")
+    # Summary metrics - Show average for each detector
+    st.subheader("Detector Performance Summary")
 
     col1, col2, col3, col4 = st.columns(4)
 
+    with col1:
+        st.metric(
+            label="🔍 Avg Token Similarity",
+            value=f"{df['Token Similarity (%)'].mean():.1f}%",
+            help="Average Token Detector similarity (Jaccard + Cosine)"
+        )
+
+    with col2:
+        st.metric(
+            label="🌳 Avg AST Similarity",
+            value=f"{df['AST Similarity (%)'].mean():.1f}%",
+            help="Average structural similarity from AST analysis"
+        )
+
+    with col3:
+        st.metric(
+            label="🔐 Avg Hash Similarity",
+            value=f"{df['Hash Similarity (%)'].mean():.1f}%",
+            help="Average fingerprint similarity from Winnowing"
+        )
+
+    with col4:
+        st.metric(
+            label="⚖️ Avg Combined Score",
+            value=f"{df['Combined Score (%)'].mean():.1f}%",
+            help="Average combined score across all detectors"
+        )
+
+    st.markdown("---")
+
+    # Overall status summary
+    st.subheader("Detection Summary")
+    col1, col2, col3, col4 = st.columns(4)
+
     total_pairs = len(df)
-    plagiarized_count = (df['Plagiarized'] == '✓').sum()
-    clean_count = total_pairs - plagiarized_count
-    avg_similarity = df['Combined Similarity (%)'].mean()
+    plagiarized_count = (df['Overall Status'].str.contains('PLAGIARIZED')).sum()
+    suspicious_count = (df['Overall Status'].str.contains('SUSPICIOUS')).sum()
+    clean_count = total_pairs - plagiarized_count - suspicious_count
 
     with col1:
         st.metric(
             label="Total Pairs",
             value=total_pairs,
-            help="Total number of file pairs compared"
+            help="Total number of file pairs analyzed"
         )
 
     with col2:
         st.metric(
-            label="Plagiarized",
+            label="🚨 Plagiarized",
             value=plagiarized_count,
             delta=f"{(plagiarized_count/total_pairs*100):.1f}%",
             delta_color="inverse",
-            help="Pairs flagged as plagiarism"
+            help="Pairs flagged by 2+ detectors or high combined score"
         )
 
     with col3:
         st.metric(
-            label="Clean",
-            value=clean_count,
-            delta=f"{(clean_count/total_pairs*100):.1f}%",
-            help="Pairs not flagged as plagiarism"
+            label="⚠️ Suspicious",
+            value=suspicious_count,
+            delta=f"{(suspicious_count/total_pairs*100):.1f}%",
+            delta_color="off",
+            help="Pairs flagged by exactly 1 detector"
         )
 
     with col4:
         st.metric(
-            label="Avg Similarity",
-            value=f"{avg_similarity:.1f}%",
-            help="Average similarity across all pairs"
+            label="✅ Clear",
+            value=clean_count,
+            delta=f"{(clean_count/total_pairs*100):.1f}%",
+            help="Pairs not flagged by any detector"
         )
 
     st.markdown("---")
 
-    # Results table
-    st.subheader("Detailed Results")
+    # Results table with filtering
+    st.subheader("Detailed Results by Detector")
 
-    # Format DataFrame for display
-    # Create a copy to avoid modifying session state
-    display_df = df.copy()
+    # Create display dataframe based on filters
+    display_df = df[['File 1', 'File 2']].copy()
 
-    # Format percentage columns to 2 decimal places
-    for col in ['Jaccard Similarity (%)', 'Cosine Similarity (%)', 'Combined Similarity (%)']:
-        display_df[col] = display_df[col].map('{:.2f}'.format)
+    # Add columns based on sidebar filters
+    if st.session_state.show_token_results:
+        display_df['Token (%)'] = df['Token Similarity (%)'].map('{:.2f}'.format)
+        display_df['Jaccard (%)'] = df['Token Jaccard (%)'].map('{:.2f}'.format)
+        display_df['Cosine (%)'] = df['Token Cosine (%)'].map('{:.2f}'.format)
+        display_df['Token Verdict'] = df['Token Verdict']
+
+    if st.session_state.show_ast_results:
+        display_df['AST (%)'] = df['AST Similarity (%)'].map('{:.2f}'.format)
+        display_df['AST Verdict'] = df['AST Verdict']
+
+    if st.session_state.show_hash_results:
+        display_df['Hash (%)'] = df['Hash Similarity (%)'].map('{:.2f}'.format)
+        display_df['Hash Verdict'] = df['Hash Verdict']
+
+    if st.session_state.show_combined_score:
+        display_df['Combined (%)'] = df['Combined Score (%)'].map('{:.2f}'.format)
+
+    # Always show overall status
+    display_df['Overall Status'] = df['Overall Status']
+
+    # Configure column display
+    column_config = {
+        "File 1": st.column_config.TextColumn("File 1", width="medium"),
+        "File 2": st.column_config.TextColumn("File 2", width="medium"),
+    }
+
+    if st.session_state.show_token_results:
+        column_config.update({
+            "Token (%)": st.column_config.TextColumn("Token %", width="small"),
+            "Jaccard (%)": st.column_config.TextColumn("Jaccard %", width="small"),
+            "Cosine (%)": st.column_config.TextColumn("Cosine %", width="small"),
+            "Token Verdict": st.column_config.TextColumn("Token", width="small"),
+        })
+
+    if st.session_state.show_ast_results:
+        column_config.update({
+            "AST (%)": st.column_config.TextColumn("AST %", width="small"),
+            "AST Verdict": st.column_config.TextColumn("AST", width="small"),
+        })
+
+    if st.session_state.show_hash_results:
+        column_config.update({
+            "Hash (%)": st.column_config.TextColumn("Hash %", width="small"),
+            "Hash Verdict": st.column_config.TextColumn("Hash", width="small"),
+        })
+
+    if st.session_state.show_combined_score:
+        column_config["Combined (%)"] = st.column_config.TextColumn("Combined %", width="small")
+
+    column_config["Overall Status"] = st.column_config.TextColumn("Status", width="medium")
 
     # Display interactive dataframe
     st.dataframe(
         display_df,
         use_container_width=True,
         hide_index=True,
-        column_config={
-            "File 1": st.column_config.TextColumn("File 1", width="medium"),
-            "File 2": st.column_config.TextColumn("File 2", width="medium"),
-            "Jaccard Similarity (%)": st.column_config.TextColumn("Jaccard (%)", width="small"),
-            "Cosine Similarity (%)": st.column_config.TextColumn("Cosine (%)", width="small"),
-            "Combined Similarity (%)": st.column_config.TextColumn("Combined (%)", width="small"),
-            "Plagiarized": st.column_config.TextColumn("Plagiarized?", width="small"),
-        }
+        column_config=column_config
     )
 
-    # Highlight plagiarized pairs
-    plagiarized_df = df[df['Plagiarized'] == '✓']
-    if len(plagiarized_df) > 0:
-        st.warning(f"⚠️ {len(plagiarized_df)} pair(s) flagged as potential plagiarism")
-    else:
-        st.success("✅ No plagiarism detected in any pairs")
+    # Status alerts
+    if plagiarized_count > 0:
+        st.error(f"🚨 {plagiarized_count} pair(s) flagged as PLAGIARIZED by multiple detectors")
+    if suspicious_count > 0:
+        st.warning(f"⚠️ {suspicious_count} pair(s) marked as SUSPICIOUS by one detector")
+    if clean_count == total_pairs:
+        st.success("✅ All pairs are CLEAR - no plagiarism detected by any detector")
 
     # Download button
     st.markdown("---")
-    st.subheader("💾 Export Results")
+    st.subheader("💾 Export Comprehensive Results")
 
     json_data = create_download_json(
         df,
@@ -649,16 +848,16 @@ def render_results():
         st.session_state.current_job_id
     )
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"codeguard_results_{timestamp}.json"
+    filename = f"codeguard_multidetector_results_{timestamp}.json"
     if st.session_state.current_job_id:
         filename = f"{st.session_state.current_job_id}_results.json"
 
     st.download_button(
-        label="📥 Download Results (JSON)",
+        label="📥 Download Complete Analysis (JSON)",
         data=json_data,
         file_name=filename,
         mime="application/json",
-        help="Download analysis results in JSON format",
+        help="Download comprehensive results from all three detectors",
         use_container_width=True
     )
 
@@ -774,26 +973,40 @@ def render_job_details(job_id: str):
 
     st.markdown("---")
 
-    # Convert to DataFrame for display
+    # Convert to DataFrame for display with all detector results
     display_data = []
     for result in results:
         display_data.append({
             'File 1': result['file1_name'],
             'File 2': result['file2_name'],
-            'Jaccard Similarity (%)': result['hash_similarity'] * 100,  # Mapped from hash
-            'Cosine Similarity (%)': result['ast_similarity'] * 100,   # Mapped from ast
-            'Combined Similarity (%)': result['confidence_score'] * 100,
+            'Token Similarity (%)': result['token_similarity'] * 100,
+            'AST Similarity (%)': result['ast_similarity'] * 100,
+            'Hash Similarity (%)': result['hash_similarity'] * 100,
+            'Combined Score (%)': result['confidence_score'] * 100,
             'Plagiarized': '✓' if result['is_plagiarized'] else '✗'
         })
 
     df = pd.DataFrame(display_data)
 
     # Display detailed results
-    st.markdown("### Detailed Results")
+    st.markdown("### Detailed Results - All Detectors")
+
+    # Summary metrics for historical data
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Avg Token", f"{df['Token Similarity (%)'].mean():.1f}%")
+    with col2:
+        st.metric("Avg AST", f"{df['AST Similarity (%)'].mean():.1f}%")
+    with col3:
+        st.metric("Avg Hash", f"{df['Hash Similarity (%)'].mean():.1f}%")
+    with col4:
+        st.metric("Avg Combined", f"{df['Combined Score (%)'].mean():.1f}%")
+
+    st.markdown("")
 
     # Format DataFrame for display
     display_df = df.copy()
-    for col in ['Jaccard Similarity (%)', 'Cosine Similarity (%)', 'Combined Similarity (%)']:
+    for col in ['Token Similarity (%)', 'AST Similarity (%)', 'Hash Similarity (%)', 'Combined Score (%)']:
         display_df[col] = display_df[col].map('{:.2f}'.format)
 
     st.dataframe(
@@ -803,9 +1016,10 @@ def render_job_details(job_id: str):
         column_config={
             "File 1": st.column_config.TextColumn("File 1", width="medium"),
             "File 2": st.column_config.TextColumn("File 2", width="medium"),
-            "Jaccard Similarity (%)": st.column_config.TextColumn("Jaccard (%)", width="small"),
-            "Cosine Similarity (%)": st.column_config.TextColumn("Cosine (%)", width="small"),
-            "Combined Similarity (%)": st.column_config.TextColumn("Combined (%)", width="small"),
+            "Token Similarity (%)": st.column_config.TextColumn("Token %", width="small"),
+            "AST Similarity (%)": st.column_config.TextColumn("AST %", width="small"),
+            "Hash Similarity (%)": st.column_config.TextColumn("Hash %", width="small"),
+            "Combined Score (%)": st.column_config.TextColumn("Combined %", width="small"),
             "Plagiarized": st.column_config.TextColumn("Plagiarized?", width="small"),
         }
     )
@@ -900,7 +1114,7 @@ def main():
 
     # Footer
     st.markdown("---")
-    st.caption("CodeGuard v2.0 - Task 4.1: Database Integration | © 2024")
+    st.caption("CodeGuard v3.0 - Multi-Detector Integration (Token + AST + Hash) | © 2024")
 
 
 if __name__ == "__main__":

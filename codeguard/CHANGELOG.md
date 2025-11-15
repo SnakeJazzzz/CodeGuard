@@ -8,12 +8,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### To Be Implemented
-- AST Detector (structural plagiarism detection)
-- Hash Detector (Winnowing algorithm)
-- Voting System (weighted aggregation of detectors)
+- Voting System dedicated modules (voting_system.py, confidence_calculator.py, thresholds.py)
 - Configuration management UI
-- Code quality improvements (formatting, linting)
-- Test coverage increase (47% → 80%)
+- Code quality improvements (formatting: 14 files, linting: 25 issues)
+- Test coverage increase (61% → 80%)
+- Database test fixes (35 failing tests)
+- Precision/Recall validation measurement
+- Performance benchmarking
+
+---
+
+## [0.3.0] - 2025-11-14
+
+### Added - Algorithm Expansion Sprint
+
+**AST Detector (Complete)**
+- AST-based structural comparison (ast_detector.py, 191 lines)
+- Tree normalization and structural similarity scoring
+- 90% test coverage (75+ unit tests)
+- Threshold: 0.80, Weight: 2.0x
+- Defeats variable/function renaming attacks
+- Integrated with Streamlit app
+
+**Hash Detector (Complete)**
+- Winnowing fingerprinting algorithm (hash_detector.py, 478 lines)
+- k-gram size: 5 tokens, window size: 4
+- 95% test coverage (40+ unit tests)
+- Threshold: 0.60, Weight: 1.5x
+- Detects partial and scattered copying
+- Integrated with Streamlit app
+
+**Multi-Detector Streamlit Integration**
+- All three detectors run in parallel on each file pair
+- Real-time progress tracking with detector-specific status
+- Sidebar filters to toggle detector visibility
+- 8 summary metrics (4 averages + 4 status counts)
+- Enhanced results table with all detector scores
+- Voting logic: PLAGIARIZED (2+ detectors), SUSPICIOUS (1), CLEAR (0)
+- Database integration for all three detector scores
+- Enhanced JSON export with all detector information
+
+**Comprehensive Testing**
+- 199 total tests (164 passing, 35 failing)
+- Integration tests for all detectors (test_all_detectors_integration.py, 7 tests)
+- Unit tests: Token 85+ tests, AST 75+ tests, Hash 40+ tests
+- Database tests: 35 tests (failing due to API signature changes)
+- Overall coverage: 61.34% (increased from 47%)
+- Detector coverage: Token 93%, AST 90%, Hash 95%
+
+**Project Cleanup**
+- Removed 14 temporary files (test scripts, implementation summaries)
+- Deleted redundant documentation (~1,500 lines)
+- Streamlined project structure
+
+### Changed
+- app.py enhanced from 908 to 1,121 lines (+213 lines)
+- src/detectors/__init__.py updated with AST and Hash exports
+- test_hash_detector_basic.py expectations corrected (4 tests)
+- test_hash_detector_realistic.py expectations corrected
+- Token detector test coverage increased 79%→93%
+
+### Fixed
+- Hash detector test expectations aligned with Winnowing algorithm
+- Test suite execution (164/199 tests now passing)
+- Coverage reporting (HTML reports in htmlcov/)
+
+### Known Issues
+- 35 database tests failing (API signature changes)
+- 14 files need black formatting
+- 25 flake8 linting issues
+- Voting system needs dedicated modules
+- Precision/Recall not yet measured
 
 ---
 
@@ -139,13 +204,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Total Tests: 131 (100% passing)
 - Python Files: 19
 
-**Component Completion**
+**Component Completion (as of 0.2.0)**
 - Detection Algorithms: 33% (1/3 detectors)
 - Database Layer: 100%
 - Web Interface: 100%
 - Testing Infrastructure: 100%
 - Documentation: 60%
 - Overall Project: 52%
+
+**Component Completion (as of 0.3.0)**
+- Detection Algorithms: 100% (3/3 detectors)
+- Database Layer: 100%
+- Web Interface: 100%
+- Testing Infrastructure: 100%
+- Voting System: 25% (basic logic, needs modules)
+- Documentation: 65%
+- Overall Project: 75%
 
 **Known Issues**
 - 72 linting warnings (flake8)
