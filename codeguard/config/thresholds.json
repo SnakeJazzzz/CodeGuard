@@ -1,0 +1,18 @@
+{
+  "confidence_weights": {
+    "ast": 0.4,
+    "hash": 0.3,
+    "token": 0.3
+  },
+  "decision_threshold": 0.5,
+  "thresholds": {
+    "ast": 0.8,
+    "hash": 0.6,
+    "token": 0.7
+  },
+  "weights": {
+    "ast": 2.0,
+    "hash": 1.5,
+    "token": 1.0
+  }
+}

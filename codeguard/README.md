@@ -20,6 +20,8 @@ CodeGuard is an intelligent code plagiarism detection system designed to help ed
   - AST detection: 2.0x weight (most reliable)
   - Hash detection: 1.5x weight (partial copies)
   - Token detection: 1.0x weight (baseline)
+  - Real-time threshold and weight adjustment via UI
+  - Confidence scoring with 5-level classification
 
 - **Interactive Web Interface**: Built with Streamlit
   - Drag-and-drop file upload
@@ -172,17 +174,41 @@ codeguard/
 
 The weighted voting mechanism combines results from all three detectors:
 
-1. Each detector compares its similarity score against its threshold
-   - Token threshold: 0.70 (default)
-   - AST threshold: 0.80 (default)
-   - Hash threshold: 0.60 (default)
+```
+Code Files → [Token Detector (1.0x)] ─┐
+          → [AST Detector   (2.0x)] ─┼→ Voting System → Decision
+          → [Hash Detector  (1.5x)] ─┘
+```
 
-2. If score > threshold, detector "votes" with its weight
+**Voting Process:**
+
+1. Each detector compares its similarity score against its threshold
+   - Token threshold: 0.70 (default, configurable)
+   - AST threshold: 0.80 (default, configurable)
+   - Hash threshold: 0.60 (default, configurable)
+
+2. If score ≥ threshold, detector "votes" with its weight
    - Total possible votes = 4.5 (1.0 + 2.0 + 1.5)
 
-3. Plagiarism flagged when weighted_votes / 4.5 ≥ 0.50 (50%)
+3. Plagiarism flagged when weighted_votes / 4.5 ≥ 0.50 (50%, configurable)
 
 4. Confidence score = (0.3 × token) + (0.4 × AST) + (0.3 × hash)
+
+**Example Usage:**
+
+```python
+from src.voting import VotingSystem
+
+voter = VotingSystem()
+result = voter.vote(token_sim=0.75, ast_sim=0.85, hash_sim=0.65)
+# result['is_plagiarized'] = True
+# result['confidence_score'] = 0.755
+# result['confidence_level'] = 'High'
+```
+
+**Configuration:**
+
+All thresholds and weights are adjustable in real-time through the Streamlit sidebar or via the configuration file at `config/thresholds.json`.
 
 ## Success Metrics
 
@@ -397,10 +423,12 @@ This is an academic project. Contributions welcome after December 2024.
 - [x] Comprehensive testing infrastructure (199 tests)
 - [x] Validation dataset creation (6 files)
 - [x] Analysis persistence and history
-- [ ] Voting system (dedicated modules)
+- [x] Voting system implementation (3 dedicated modules, 218 tests)
+- [x] Streamlit voting system integration
+- [x] Configuration UI (7 sliders, session state)
 - [ ] Database test fixes (35 failing tests)
-- [ ] Increase test coverage (61% → 80%)
-- [ ] Code quality improvements (black: 14 files, flake8: 25 issues)
+- [ ] Increase test coverage (68% → 80%)
+- [ ] Code quality improvements (black, flake8)
 - [ ] Precision/Recall validation measurement
 - [ ] Performance benchmarking
 - [ ] Documentation completion

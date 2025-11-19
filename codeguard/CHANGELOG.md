@@ -8,13 +8,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### To Be Implemented
-- Voting System dedicated modules (voting_system.py, confidence_calculator.py, thresholds.py)
-- Configuration management UI
-- Code quality improvements (formatting: 14 files, linting: 25 issues)
-- Test coverage increase (61% → 80%)
+- Code quality improvements (formatting and linting)
+- Test coverage increase (68% → 80%)
 - Database test fixes (35 failing tests)
 - Precision/Recall validation measurement
 - Performance benchmarking
+- Deployment preparation
+
+---
+
+## [0.4.0] - 2025-11-18
+
+### Added - Voting System & Integration Sprint
+
+**Voting System Core (Complete)**
+- VotingSystem class with weighted voting logic (voting_system.py, 367 lines)
+- Confidence calculator with 5-level classification (confidence_calculator.py, 351 lines)
+- ThresholdManager for configuration management (thresholds.py, 600 lines)
+- JSON configuration file (config/thresholds.json)
+- 218 comprehensive unit tests (99.7% coverage)
+  - test_voting_system.py: 103 tests
+  - test_confidence_calculator.py: 68 tests
+  - test_thresholds.py: 47 tests
+
+**Streamlit Integration (Complete)**
+- Replaced simple majority voting with weighted voting system
+- Configuration sidebar with 7 adjustable sliders
+  - Token threshold: 0.5-0.9 (default 0.70)
+  - AST threshold: 0.6-0.95 (default 0.80)
+  - Hash threshold: 0.4-0.8 (default 0.60)
+  - Token weight: 0.5-2.0 (default 1.0)
+  - AST weight: 1.0-3.0 (default 2.0)
+  - Hash weight: 0.5-2.5 (default 1.5)
+  - Decision threshold: 0.3-0.7 (default 0.50)
+- "Reset to Defaults" button
+- Current configuration display showing total votes and decision criteria
+- Session state persistence for configuration
+- Visual status indicator (default vs custom config)
+
+**Results Enhancements**
+- New DataFrame columns: plagiarism_detected, confidence_score, confidence_level, weighted_votes
+- Individual detector votes displayed
+- Visual indicators: warning for plagiarized, checkmark for clear
+- Summary metrics: detector performance, voting system stats, agreement rate
+- Detailed voting breakdown for each plagiarized pair
+- Enhanced JSON export with voting metadata and dynamic configuration
+
+### Changed
+- app.py enhanced from 1,121 to 1,477 lines (approximately 400 lines added/modified)
+- Updated results display with current threshold configuration
+- Modified plagiarism detection logic to use VotingSystem class
+- Enhanced database integration (no schema changes needed)
+
+### Fixed
+- TypeError in voting_system.py line 98 when checking decision_threshold float with 'in' operator
+- Changed to isinstance(detector, dict) check to properly filter non-dictionary configuration values
+
+### Quality Metrics
+- Code written: 3,730 lines (1,318 implementation + 2,412 tests)
+- Test coverage: 99.7% on voting system modules
+- Test-to-code ratio: 1.8:1
+- All 218 voting system tests passing
 
 ---
 
@@ -220,6 +274,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Voting System: 25% (basic logic, needs modules)
 - Documentation: 65%
 - Overall Project: 75%
+
+**Component Completion (as of 0.4.0)**
+- Detection Algorithms: 100% (3/3 detectors)
+- Database Layer: 100%
+- Web Interface: 100%
+- Testing Infrastructure: 100%
+- Voting System: 100% (3 modules, 218 tests, Streamlit integration)
+- Testing & Validation: 70% (unit tests complete, validation pending)
+- Documentation: 70%
+- Overall Project: 85%
 
 **Known Issues**
 - 72 linting warnings (flake8)
