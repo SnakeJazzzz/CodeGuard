@@ -11,4 +11,4 @@ from .token_detector import TokenDetector
 from .ast_detector import ASTDetector
 from .hash_detector import HashDetector
 
-__all__ = ['TokenDetector', 'ASTDetector', 'HashDetector']
+__all__ = ["TokenDetector", "ASTDetector", "HashDetector"]

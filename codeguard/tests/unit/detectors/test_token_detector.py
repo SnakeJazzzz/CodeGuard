@@ -21,7 +21,7 @@ class TestTokenDetectorInitialization:
         """Test TokenDetector initializes with default threshold."""
         detector = TokenDetector()
         assert detector.threshold == 0.7
-        assert hasattr(detector, 'SEMANTIC_TOKEN_TYPES')
+        assert hasattr(detector, "SEMANTIC_TOKEN_TYPES")
 
     def test_custom_threshold(self):
         """Test TokenDetector initializes with custom threshold."""
@@ -59,9 +59,9 @@ class TestTokenization:
         tokens = detector._tokenize_code(code)
 
         assert len(tokens) > 0
-        assert 'x' in tokens
-        assert '=' in tokens
-        assert '5' in tokens
+        assert "x" in tokens
+        assert "=" in tokens
+        assert "5" in tokens
 
     def test_tokenize_function_definition(self):
         """Test tokenization of function definition."""
@@ -70,10 +70,10 @@ class TestTokenization:
     return a + b"""
         tokens = detector._tokenize_code(code)
 
-        assert 'def' in tokens
-        assert 'add' in tokens
-        assert 'return' in tokens
-        assert '+' in tokens
+        assert "def" in tokens
+        assert "add" in tokens
+        assert "return" in tokens
+        assert "+" in tokens
 
     def test_tokenize_filters_comments(self):
         """Test that tokenization filters out comments."""
@@ -83,11 +83,11 @@ x = 5  # Inline comment"""
         tokens = detector._tokenize_code(code)
 
         # Comments should not appear in tokens
-        assert 'this' not in [t.lower() for t in tokens]
-        assert 'comment' not in [t.lower() for t in tokens]
+        assert "this" not in [t.lower() for t in tokens]
+        assert "comment" not in [t.lower() for t in tokens]
         # But code should still be present
-        assert 'x' in tokens
-        assert '5' in tokens
+        assert "x" in tokens
+        assert "5" in tokens
 
     def test_tokenize_empty_code(self):
         """Test tokenization of empty code returns empty list."""
@@ -115,8 +115,8 @@ x = 5  # Inline comment"""
         code = "MyVariable = 10"
         tokens = detector._tokenize_code(code)
 
-        assert 'myvariable' in tokens
-        assert 'MyVariable' not in tokens
+        assert "myvariable" in tokens
+        assert "MyVariable" not in tokens
 
     def test_tokenize_complex_code(self):
         """Test tokenization of complex code structure."""
@@ -132,9 +132,9 @@ class Calculator:
         tokens = detector._tokenize_code(code)
 
         assert len(tokens) > 10
-        assert 'class' in tokens
-        assert 'def' in tokens
-        assert 'self' in tokens
+        assert "class" in tokens
+        assert "def" in tokens
+        assert "self" in tokens
 
 
 class TestJaccardSimilarity:
@@ -143,24 +143,24 @@ class TestJaccardSimilarity:
     def test_identical_tokens(self):
         """Test Jaccard similarity of identical token lists is 1.0."""
         detector = TokenDetector()
-        tokens1 = ['a', 'b', 'c']
-        tokens2 = ['a', 'b', 'c']
+        tokens1 = ["a", "b", "c"]
+        tokens2 = ["a", "b", "c"]
         similarity = detector._calculate_jaccard_similarity(tokens1, tokens2)
         assert similarity == 1.0
 
     def test_disjoint_tokens(self):
         """Test Jaccard similarity of disjoint token lists is 0.0."""
         detector = TokenDetector()
-        tokens1 = ['a', 'b', 'c']
-        tokens2 = ['x', 'y', 'z']
+        tokens1 = ["a", "b", "c"]
+        tokens2 = ["x", "y", "z"]
         similarity = detector._calculate_jaccard_similarity(tokens1, tokens2)
         assert similarity == 0.0
 
     def test_partial_overlap(self):
         """Test Jaccard similarity with partial overlap."""
         detector = TokenDetector()
-        tokens1 = ['a', 'b', 'c', 'd']
-        tokens2 = ['c', 'd', 'e', 'f']
+        tokens1 = ["a", "b", "c", "d"]
+        tokens2 = ["c", "d", "e", "f"]
         # Intersection: {c, d} = 2 elements
         # Union: {a, b, c, d, e, f} = 6 elements
         # Jaccard = 2/6 = 0.333...
@@ -176,7 +176,7 @@ class TestJaccardSimilarity:
     def test_one_empty_token_list(self):
         """Test Jaccard similarity when one token list is empty."""
         detector = TokenDetector()
-        tokens1 = ['a', 'b', 'c']
+        tokens1 = ["a", "b", "c"]
         tokens2 = []
         similarity = detector._calculate_jaccard_similarity(tokens1, tokens2)
         assert similarity == 0.0
@@ -184,8 +184,8 @@ class TestJaccardSimilarity:
     def test_duplicate_tokens(self):
         """Test Jaccard similarity with duplicate tokens (sets ignore duplicates)."""
         detector = TokenDetector()
-        tokens1 = ['a', 'a', 'b', 'b', 'c']
-        tokens2 = ['a', 'b', 'c', 'c']
+        tokens1 = ["a", "a", "b", "b", "c"]
+        tokens2 = ["a", "b", "c", "c"]
         # Both convert to set {a, b, c}
         similarity = detector._calculate_jaccard_similarity(tokens1, tokens2)
         assert similarity == 1.0
@@ -197,24 +197,24 @@ class TestCosineSimilarity:
     def test_identical_tokens(self):
         """Test Cosine similarity of identical token lists is 1.0."""
         detector = TokenDetector()
-        tokens1 = ['a', 'b', 'c']
-        tokens2 = ['a', 'b', 'c']
+        tokens1 = ["a", "b", "c"]
+        tokens2 = ["a", "b", "c"]
         similarity = detector._calculate_cosine_similarity(tokens1, tokens2)
         assert abs(similarity - 1.0) < 0.0001  # Allow for floating point imprecision
 
     def test_disjoint_tokens(self):
         """Test Cosine similarity of disjoint token lists is 0.0."""
         detector = TokenDetector()
-        tokens1 = ['a', 'b', 'c']
-        tokens2 = ['x', 'y', 'z']
+        tokens1 = ["a", "b", "c"]
+        tokens2 = ["x", "y", "z"]
         similarity = detector._calculate_cosine_similarity(tokens1, tokens2)
         assert similarity == 0.0
 
     def test_partial_overlap(self):
         """Test Cosine similarity with partial overlap."""
         detector = TokenDetector()
-        tokens1 = ['a', 'b', 'c']
-        tokens2 = ['a', 'b', 'd']
+        tokens1 = ["a", "b", "c"]
+        tokens2 = ["a", "b", "d"]
         similarity = detector._calculate_cosine_similarity(tokens1, tokens2)
         # Should be > 0 and < 1
         assert 0.0 < similarity < 1.0
@@ -222,13 +222,13 @@ class TestCosineSimilarity:
     def test_empty_first_list(self):
         """Test Cosine similarity when first token list is empty."""
         detector = TokenDetector()
-        similarity = detector._calculate_cosine_similarity([], ['a', 'b', 'c'])
+        similarity = detector._calculate_cosine_similarity([], ["a", "b", "c"])
         assert similarity == 0.0
 
     def test_empty_second_list(self):
         """Test Cosine similarity when second token list is empty."""
         detector = TokenDetector()
-        similarity = detector._calculate_cosine_similarity(['a', 'b', 'c'], [])
+        similarity = detector._calculate_cosine_similarity(["a", "b", "c"], [])
         assert similarity == 0.0
 
     def test_empty_both_lists(self):
@@ -240,8 +240,8 @@ class TestCosineSimilarity:
     def test_frequency_matters(self):
         """Test Cosine similarity accounts for token frequency."""
         detector = TokenDetector()
-        tokens1 = ['a', 'a', 'a', 'b']
-        tokens2 = ['a', 'b', 'b', 'b']
+        tokens1 = ["a", "a", "a", "b"]
+        tokens2 = ["a", "b", "b", "b"]
         # Different frequencies should result in < 1.0 similarity
         similarity = detector._calculate_cosine_similarity(tokens1, tokens2)
         assert 0.0 < similarity < 1.0
@@ -299,18 +299,18 @@ class TestAnalyzeMethod:
             file1 = Path(tmpdir) / "file1.py"
             file2 = Path(tmpdir) / "file2.py"
 
-            code = sample_code_pairs['identical']['code1']
+            code = sample_code_pairs["identical"]["code1"]
             file1.write_text(code)
             file2.write_text(code)
 
             result = detector.analyze(file1, file2)
 
-            assert abs(result['similarity_score'] - 1.0) < 0.0001
-            assert result['is_plagiarism'] is True
-            assert result['threshold'] == 0.7
-            assert abs(result['jaccard_similarity'] - 1.0) < 0.0001
-            assert abs(result['cosine_similarity'] - 1.0) < 0.0001
-            assert 'details' in result
+            assert abs(result["similarity_score"] - 1.0) < 0.0001
+            assert result["is_plagiarism"] is True
+            assert result["threshold"] == 0.7
+            assert abs(result["jaccard_similarity"] - 1.0) < 0.0001
+            assert abs(result["cosine_similarity"] - 1.0) < 0.0001
+            assert "details" in result
 
     def test_analyze_different_files(self, sample_code_pairs):
         """Test analyzing completely different files."""
@@ -320,13 +320,13 @@ class TestAnalyzeMethod:
             file1 = Path(tmpdir) / "file1.py"
             file2 = Path(tmpdir) / "file2.py"
 
-            file1.write_text(sample_code_pairs['different']['code1'])
-            file2.write_text(sample_code_pairs['different']['code2'])
+            file1.write_text(sample_code_pairs["different"]["code1"])
+            file2.write_text(sample_code_pairs["different"]["code2"])
 
             result = detector.analyze(file1, file2)
 
-            assert result['similarity_score'] < 0.7
-            assert result['is_plagiarism'] is False
+            assert result["similarity_score"] < 0.7
+            assert result["is_plagiarism"] is False
 
     def test_analyze_renamed_variables(self, sample_code_pairs):
         """Test analyzing code with renamed variables."""
@@ -336,16 +336,16 @@ class TestAnalyzeMethod:
             file1 = Path(tmpdir) / "file1.py"
             file2 = Path(tmpdir) / "file2.py"
 
-            file1.write_text(sample_code_pairs['renamed']['code1'])
-            file2.write_text(sample_code_pairs['renamed']['code2'])
+            file1.write_text(sample_code_pairs["renamed"]["code1"])
+            file2.write_text(sample_code_pairs["renamed"]["code2"])
 
             result = detector.analyze(file1, file2)
 
             # Token detector less effective with renamed variables
-            assert result['similarity_score'] > 0.3  # Lowered expectation for token detector
-            assert 'details' in result
-            assert result['details']['file1_tokens'] > 0
-            assert result['details']['file2_tokens'] > 0
+            assert result["similarity_score"] > 0.3  # Lowered expectation for token detector
+            assert "details" in result
+            assert result["details"]["file1_tokens"] > 0
+            assert result["details"]["file2_tokens"] > 0
 
     def test_analyze_nonexistent_file1(self):
         """Test analyzing when first file doesn't exist."""
@@ -385,20 +385,20 @@ class TestAnalyzeMethod:
             result = detector.analyze(file1, file2)
 
             # Check all required keys are present
-            assert 'similarity_score' in result
-            assert 'is_plagiarism' in result
-            assert 'threshold' in result
-            assert 'jaccard_similarity' in result
-            assert 'cosine_similarity' in result
-            assert 'details' in result
+            assert "similarity_score" in result
+            assert "is_plagiarism" in result
+            assert "threshold" in result
+            assert "jaccard_similarity" in result
+            assert "cosine_similarity" in result
+            assert "details" in result
 
             # Check details structure
-            details = result['details']
-            assert 'file1_tokens' in details
-            assert 'file2_tokens' in details
-            assert 'common_tokens' in details
-            assert 'file1_path' in details
-            assert 'file2_path' in details
+            details = result["details"]
+            assert "file1_tokens" in details
+            assert "file2_tokens" in details
+            assert "common_tokens" in details
+            assert "file1_path" in details
+            assert "file2_path" in details
 
 
 class TestEdgeCases:
@@ -422,7 +422,7 @@ class TestEdgeCases:
         tokens = detector._tokenize_code(code)
 
         assert len(tokens) > 0
-        assert 'text' in tokens
+        assert "text" in tokens
 
     def test_multiline_strings(self):
         """Test handling of multiline strings."""
@@ -439,17 +439,17 @@ multiline string
     def test_nested_structures(self):
         """Test handling of deeply nested structures."""
         detector = TokenDetector()
-        code = '''
+        code = """
 def outer():
     def inner():
         def innermost():
             return 42
         return innermost()
     return inner()
-'''
+"""
         tokens = detector._tokenize_code(code)
         assert len(tokens) > 0
-        assert tokens.count('def') == 3
+        assert tokens.count("def") == 3
 
     def test_special_characters_in_operators(self):
         """Test handling of special operator characters."""
@@ -457,13 +457,13 @@ def outer():
         code = "result = (a + b) * (c - d) / (e // f) ** g % h"
         tokens = detector._tokenize_code(code)
 
-        assert '+' in tokens
-        assert '*' in tokens
-        assert '-' in tokens
-        assert '/' in tokens
-        assert '//' in tokens
-        assert '**' in tokens
-        assert '%' in tokens
+        assert "+" in tokens
+        assert "*" in tokens
+        assert "-" in tokens
+        assert "/" in tokens
+        assert "//" in tokens
+        assert "**" in tokens
+        assert "%" in tokens
 
     def test_analyze_with_pathlib_path(self):
         """Test analyze() works with pathlib.Path objects."""
@@ -478,7 +478,7 @@ def outer():
 
             # Should work with Path objects
             result = detector.analyze(file1, file2)
-            assert 'similarity_score' in result
+            assert "similarity_score" in result
 
     def test_analyze_with_string_paths(self):
         """Test analyze() works with string paths."""
@@ -493,7 +493,7 @@ def outer():
 
             # Should work with string paths
             result = detector.analyze(str(file1), str(file2))
-            assert 'similarity_score' in result
+            assert "similarity_score" in result
 
 
 class TestThresholdBehavior:
@@ -515,7 +515,7 @@ class TestThresholdBehavior:
 
             result = detector.analyze(file1, file2)
 
-            assert result['is_plagiarism'] is False
+            assert result["is_plagiarism"] is False
 
     def test_at_threshold_is_plagiarism(self):
         """Test that similarity at threshold is flagged as plagiarism."""
@@ -531,7 +531,7 @@ class TestThresholdBehavior:
             result = detector.analyze(file1, file2)
 
             # Any similarity ≥ 0.0 should be flagged
-            assert result['is_plagiarism'] is True
+            assert result["is_plagiarism"] is True
 
     def test_above_threshold_is_plagiarism(self):
         """Test that similarity above threshold is flagged as plagiarism."""
@@ -548,18 +548,21 @@ class TestThresholdBehavior:
 
             result = detector.analyze(file1, file2)
 
-            assert result['similarity_score'] >= 0.5
-            assert result['is_plagiarism'] is True
+            assert result["similarity_score"] >= 0.5
+            assert result["is_plagiarism"] is True
 
 
-@pytest.mark.parametrize("threshold,expected_valid", [
-    (0.0, True),
-    (0.5, True),
-    (1.0, True),
-    (-0.1, False),
-    (1.1, False),
-    (2.0, False),
-])
+@pytest.mark.parametrize(
+    "threshold,expected_valid",
+    [
+        (0.0, True),
+        (0.5, True),
+        (1.0, True),
+        (-0.1, False),
+        (1.1, False),
+        (2.0, False),
+    ],
+)
 def test_threshold_validation(threshold, expected_valid):
     """Test threshold validation with various values."""
     if expected_valid:

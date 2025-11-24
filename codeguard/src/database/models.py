@@ -46,17 +46,16 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 # Valid status values for AnalysisJob (must match schema.sql CHECK constraint)
-VALID_STATUSES = {'pending', 'running', 'completed', 'failed'}
+VALID_STATUSES = {"pending", "running", "completed", "failed"}
 
 # Status aliases for backward compatibility
 # 'processing' is an alias for 'running'
-STATUS_ALIASES = {
-    'processing': 'running'
-}
+STATUS_ALIASES = {"processing": "running"}
 
 # =============================================================================
 # Model Classes
 # =============================================================================
+
 
 class AnalysisJob:
     """
@@ -95,7 +94,7 @@ class AnalysisJob:
         file_count: int,
         pair_count: int,
         created_at: Optional[datetime] = None,
-        results_path: Optional[str] = None
+        results_path: Optional[str] = None,
     ):
         """
         Initialize an AnalysisJob instance.
@@ -125,7 +124,7 @@ class AnalysisJob:
             raise ValueError(f"pair_count must be non-negative, got {pair_count}")
 
         # Placeholder for relationship (populated by database operations)
-        self._comparison_results: List['ComparisonResult'] = []
+        self._comparison_results: List["ComparisonResult"] = []
 
     @property
     def status(self) -> str:
@@ -153,12 +152,12 @@ class AnalysisJob:
         self._status = normalized_value
 
     @property
-    def comparison_results(self) -> List['ComparisonResult']:
+    def comparison_results(self) -> List["ComparisonResult"]:
         """Get the list of comparison results for this job."""
         return self._comparison_results
 
     @comparison_results.setter
-    def comparison_results(self, value: List['ComparisonResult']) -> None:
+    def comparison_results(self, value: List["ComparisonResult"]) -> None:
         """Set the comparison results list."""
         self._comparison_results = value
 
@@ -175,16 +174,16 @@ class AnalysisJob:
             >>> print(data['status'])  # 'pending'
         """
         return {
-            'id': self.id,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'status': self.status,
-            'file_count': self.file_count,
-            'pair_count': self.pair_count,
-            'results_path': self.results_path
+            "id": self.id,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "status": self.status,
+            "file_count": self.file_count,
+            "pair_count": self.pair_count,
+            "results_path": self.results_path,
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'AnalysisJob':
+    def from_dict(cls, data: Dict[str, Any]) -> "AnalysisJob":
         """
         Create an AnalysisJob instance from a dictionary.
 
@@ -208,17 +207,17 @@ class AnalysisJob:
             >>> job = AnalysisJob.from_dict(data)
         """
         # Parse datetime if provided as string
-        created_at = data.get('created_at')
+        created_at = data.get("created_at")
         if isinstance(created_at, str):
             created_at = datetime.fromisoformat(created_at)
 
         return cls(
-            id=data['id'],
-            status=data['status'],
-            file_count=data['file_count'],
-            pair_count=data['pair_count'],
+            id=data["id"],
+            status=data["status"],
+            file_count=data["file_count"],
+            pair_count=data["pair_count"],
             created_at=created_at,
-            results_path=data.get('results_path')
+            results_path=data.get("results_path"),
         )
 
     def __repr__(self) -> str:
@@ -279,7 +278,7 @@ class ComparisonResult:
         is_plagiarized: bool,
         confidence_score: float,
         id: Optional[int] = None,
-        created_at: Optional[datetime] = None
+        created_at: Optional[datetime] = None,
     ):
         """
         Initialize a ComparisonResult instance.
@@ -311,10 +310,10 @@ class ComparisonResult:
         self.created_at = created_at or datetime.utcnow()
 
         # Validate similarity scores
-        self._validate_score('token_similarity', token_similarity)
-        self._validate_score('ast_similarity', ast_similarity)
-        self._validate_score('hash_similarity', hash_similarity)
-        self._validate_score('confidence_score', confidence_score)
+        self._validate_score("token_similarity", token_similarity)
+        self._validate_score("ast_similarity", ast_similarity)
+        self._validate_score("hash_similarity", hash_similarity)
+        self._validate_score("confidence_score", confidence_score)
 
     @staticmethod
     def _validate_score(name: str, value: float) -> None:
@@ -329,9 +328,7 @@ class ComparisonResult:
             ValueError: If score is not in [0.0, 1.0] range
         """
         if not 0.0 <= value <= 1.0:
-            raise ValueError(
-                f"{name} must be between 0.0 and 1.0, got {value}"
-            )
+            raise ValueError(f"{name} must be between 0.0 and 1.0, got {value}")
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -346,20 +343,20 @@ class ComparisonResult:
             >>> print(data['is_plagiarized'])  # True or False
         """
         return {
-            'id': self.id,
-            'job_id': self.job_id,
-            'file1_name': self.file1_name,
-            'file2_name': self.file2_name,
-            'token_similarity': self.token_similarity,
-            'ast_similarity': self.ast_similarity,
-            'hash_similarity': self.hash_similarity,
-            'is_plagiarized': self.is_plagiarized,
-            'confidence_score': self.confidence_score,
-            'created_at': self.created_at.isoformat() if self.created_at else None
+            "id": self.id,
+            "job_id": self.job_id,
+            "file1_name": self.file1_name,
+            "file2_name": self.file2_name,
+            "token_similarity": self.token_similarity,
+            "ast_similarity": self.ast_similarity,
+            "hash_similarity": self.hash_similarity,
+            "is_plagiarized": self.is_plagiarized,
+            "confidence_score": self.confidence_score,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'ComparisonResult':
+    def from_dict(cls, data: Dict[str, Any]) -> "ComparisonResult":
         """
         Create a ComparisonResult instance from a dictionary.
 
@@ -387,21 +384,21 @@ class ComparisonResult:
             >>> result = ComparisonResult.from_dict(data)
         """
         # Parse datetime if provided as string
-        created_at = data.get('created_at')
+        created_at = data.get("created_at")
         if isinstance(created_at, str):
             created_at = datetime.fromisoformat(created_at)
 
         return cls(
-            id=data.get('id'),
-            job_id=data['job_id'],
-            file1_name=data['file1_name'],
-            file2_name=data['file2_name'],
-            token_similarity=data['token_similarity'],
-            ast_similarity=data['ast_similarity'],
-            hash_similarity=data['hash_similarity'],
-            is_plagiarized=data['is_plagiarized'],
-            confidence_score=data['confidence_score'],
-            created_at=created_at
+            id=data.get("id"),
+            job_id=data["job_id"],
+            file1_name=data["file1_name"],
+            file2_name=data["file2_name"],
+            token_similarity=data["token_similarity"],
+            ast_similarity=data["ast_similarity"],
+            hash_similarity=data["hash_similarity"],
+            is_plagiarized=data["is_plagiarized"],
+            confidence_score=data["confidence_score"],
+            created_at=created_at,
         )
 
     def __repr__(self) -> str:
@@ -440,12 +437,7 @@ class Configuration:
         >>> config.value = '0.85'  # Updates automatically track time
     """
 
-    def __init__(
-        self,
-        key: str,
-        value: str,
-        updated_at: Optional[datetime] = None
-    ):
+    def __init__(self, key: str, value: str, updated_at: Optional[datetime] = None):
         """
         Initialize a Configuration instance.
 
@@ -471,13 +463,13 @@ class Configuration:
             >>> print(data['key'])  # 'threshold'
         """
         return {
-            'key': self.key,
-            'value': self.value,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+            "key": self.key,
+            "value": self.value,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'Configuration':
+    def from_dict(cls, data: Dict[str, Any]) -> "Configuration":
         """
         Create a Configuration instance from a dictionary.
 
@@ -495,15 +487,11 @@ class Configuration:
             >>> config = Configuration.from_dict(data)
         """
         # Parse datetime if provided as string
-        updated_at = data.get('updated_at')
+        updated_at = data.get("updated_at")
         if isinstance(updated_at, str):
             updated_at = datetime.fromisoformat(updated_at)
 
-        return cls(
-            key=data['key'],
-            value=data['value'],
-            updated_at=updated_at
-        )
+        return cls(key=data["key"], value=data["value"], updated_at=updated_at)
 
     def get_json_value(self) -> Any:
         """
@@ -552,6 +540,7 @@ class Configuration:
 # Module-Level Functions
 # =============================================================================
 
+
 def row_to_analysis_job(row: Any) -> AnalysisJob:
     """
     Convert a database row (sqlite3.Row) to an AnalysisJob instance.
@@ -568,17 +557,17 @@ def row_to_analysis_job(row: Any) -> AnalysisJob:
         >>> job = row_to_analysis_job(row)
     """
     # Parse datetime string if needed
-    created_at = row['created_at']
+    created_at = row["created_at"]
     if isinstance(created_at, str):
         created_at = datetime.fromisoformat(created_at)
 
     return AnalysisJob(
-        id=row['id'],
+        id=row["id"],
         created_at=created_at,
-        status=row['status'],
-        file_count=row['file_count'],
-        pair_count=row['pair_count'],
-        results_path=row['results_path']
+        status=row["status"],
+        file_count=row["file_count"],
+        pair_count=row["pair_count"],
+        results_path=row["results_path"],
     )
 
 
@@ -598,21 +587,21 @@ def row_to_comparison_result(row: Any) -> ComparisonResult:
         >>> results = [row_to_comparison_result(row) for row in rows]
     """
     # Parse datetime string if needed
-    created_at = row['created_at']
+    created_at = row["created_at"]
     if isinstance(created_at, str):
         created_at = datetime.fromisoformat(created_at)
 
     return ComparisonResult(
-        id=row['id'],
-        job_id=row['job_id'],
-        file1_name=row['file1_name'],
-        file2_name=row['file2_name'],
-        token_similarity=row['token_similarity'],
-        ast_similarity=row['ast_similarity'],
-        hash_similarity=row['hash_similarity'],
-        is_plagiarized=bool(row['is_plagiarized']),
-        confidence_score=row['confidence_score'],
-        created_at=created_at
+        id=row["id"],
+        job_id=row["job_id"],
+        file1_name=row["file1_name"],
+        file2_name=row["file2_name"],
+        token_similarity=row["token_similarity"],
+        ast_similarity=row["ast_similarity"],
+        hash_similarity=row["hash_similarity"],
+        is_plagiarized=bool(row["is_plagiarized"]),
+        confidence_score=row["confidence_score"],
+        created_at=created_at,
     )
 
 
@@ -632,15 +621,11 @@ def row_to_configuration(row: Any) -> Configuration:
         >>> config = row_to_configuration(row)
     """
     # Parse datetime string if needed
-    updated_at = row['updated_at']
+    updated_at = row["updated_at"]
     if isinstance(updated_at, str):
         updated_at = datetime.fromisoformat(updated_at)
 
-    return Configuration(
-        key=row['key'],
-        value=row['value'],
-        updated_at=updated_at
-    )
+    return Configuration(key=row["key"], value=row["value"], updated_at=updated_at)
 
 
 # =============================================================================

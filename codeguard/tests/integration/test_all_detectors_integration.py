@@ -31,6 +31,7 @@ from typing import Tuple, Dict, Any
 
 # Add src to path for imports
 import sys
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -43,6 +44,7 @@ from src.detectors.hash_detector import HashDetector
 # =============================================================================
 # Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def temp_file_pair():
@@ -66,13 +68,17 @@ def temp_file_pair():
     def _create_pair(code1: str, code2: str) -> Tuple[str, str]:
         """Create two temporary files with the given code content."""
         # Create first file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False, encoding='utf-8') as f1:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".py", delete=False, encoding="utf-8"
+        ) as f1:
             f1.write(code1)
             file1 = f1.name
             created_files.append(file1)
 
         # Create second file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False, encoding='utf-8') as f2:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".py", delete=False, encoding="utf-8"
+        ) as f2:
             f2.write(code2)
             file2 = f2.name
             created_files.append(file2)
@@ -111,15 +117,16 @@ def all_detectors():
             result = token_detector.analyze(file1, file2)
     """
     return {
-        'token': TokenDetector(threshold=0.7),
-        'ast': ASTDetector(threshold=0.8),
-        'hash': HashDetector(threshold=0.6, k=5, w=4)
+        "token": TokenDetector(threshold=0.7),
+        "ast": ASTDetector(threshold=0.8),
+        "hash": HashDetector(threshold=0.6, k=5, w=4),
     }
 
 
 # =============================================================================
 # Integration Tests
 # =============================================================================
+
 
 class TestAllDetectorsIntegration:
     """
@@ -163,28 +170,30 @@ if __name__ == "__main__":
         file1, file2 = temp_file_pair(code, code)
 
         # Act: Run all three detectors
-        token_result = all_detectors['token'].analyze(file1, file2)
-        ast_result = all_detectors['ast'].analyze(file1, file2)
-        hash_result = all_detectors['hash'].analyze(file1, file2)
+        token_result = all_detectors["token"].analyze(file1, file2)
+        ast_result = all_detectors["ast"].analyze(file1, file2)
+        hash_result = all_detectors["hash"].analyze(file1, file2)
 
         # Assert: All detectors should report very high similarity
-        assert token_result['similarity_score'] > 0.95, \
-            f"Token detector should detect identical files, got {token_result['similarity_score']:.2f}"
+        assert (
+            token_result["similarity_score"] > 0.95
+        ), f"Token detector should detect identical files, got {token_result['similarity_score']:.2f}"
 
-        assert ast_result['similarity_score'] > 0.95, \
-            f"AST detector should detect identical files, got {ast_result['similarity_score']:.2f}"
+        assert (
+            ast_result["similarity_score"] > 0.95
+        ), f"AST detector should detect identical files, got {ast_result['similarity_score']:.2f}"
 
-        assert hash_result['similarity_score'] > 0.95, \
-            f"Hash detector should detect identical files, got {hash_result['similarity_score']:.2f}"
+        assert (
+            hash_result["similarity_score"] > 0.95
+        ), f"Hash detector should detect identical files, got {hash_result['similarity_score']:.2f}"
 
         # Verify plagiarism flag
-        assert token_result['is_plagiarism'] is True, "Token detector should flag as plagiarism"
+        assert token_result["is_plagiarism"] is True, "Token detector should flag as plagiarism"
 
         # All similarity scores should be in valid range [0.0, 1.0]
-        assert 0.0 <= token_result['similarity_score'] <= 1.0
-        assert 0.0 <= ast_result['similarity_score'] <= 1.0
-        assert 0.0 <= hash_result['similarity_score'] <= 1.0
-
+        assert 0.0 <= token_result["similarity_score"] <= 1.0
+        assert 0.0 <= ast_result["similarity_score"] <= 1.0
+        assert 0.0 <= hash_result["similarity_score"] <= 1.0
 
     def test_renamed_variables(self, temp_file_pair, all_detectors):
         """
@@ -240,37 +249,41 @@ def compute_total(numbers):
         file1, file2 = temp_file_pair(code1, code2)
 
         # Act: Run all three detectors
-        token_result = all_detectors['token'].analyze(file1, file2)
-        ast_result = all_detectors['ast'].analyze(file1, file2)
-        hash_result = all_detectors['hash'].analyze(file1, file2)
+        token_result = all_detectors["token"].analyze(file1, file2)
+        ast_result = all_detectors["ast"].analyze(file1, file2)
+        hash_result = all_detectors["hash"].analyze(file1, file2)
 
         # Assert: AST should be high, Token and Hash should be lower
-        assert ast_result['similarity_score'] > 0.8, \
-            f"AST detector should catch renamed variables, got {ast_result['similarity_score']:.2f}"
+        assert (
+            ast_result["similarity_score"] > 0.8
+        ), f"AST detector should catch renamed variables, got {ast_result['similarity_score']:.2f}"
 
         # Token detector shows moderate similarity due to shared keywords and operators
         # Even with renamed variables, Python keywords (def, for, if, return) match
-        assert token_result['similarity_score'] < 0.7, \
-            f"Token detector should report lower similarity than AST for renamed code, got {token_result['similarity_score']:.2f}"
+        assert (
+            token_result["similarity_score"] < 0.7
+        ), f"Token detector should report lower similarity than AST for renamed code, got {token_result['similarity_score']:.2f}"
 
         # Hash detector is similarly affected by shared structural patterns
-        assert hash_result['similarity_score'] < 0.5, \
-            f"Hash detector should report lower similarity than AST for renamed code, got {hash_result['similarity_score']:.2f}"
+        assert (
+            hash_result["similarity_score"] < 0.5
+        ), f"Hash detector should report lower similarity than AST for renamed code, got {hash_result['similarity_score']:.2f}"
 
         # Key validation: AST similarity should be higher than Token and Hash
-        assert ast_result['similarity_score'] > token_result['similarity_score'], \
-            "AST similarity should exceed Token similarity for renamed variables"
-        assert ast_result['similarity_score'] > hash_result['similarity_score'], \
-            "AST similarity should exceed Hash similarity for renamed variables"
+        assert (
+            ast_result["similarity_score"] > token_result["similarity_score"]
+        ), "AST similarity should exceed Token similarity for renamed variables"
+        assert (
+            ast_result["similarity_score"] > hash_result["similarity_score"]
+        ), "AST similarity should exceed Hash similarity for renamed variables"
 
         # Verify AST detects this as plagiarism (above its threshold of 0.8)
         # Token and Hash should not flag this (below their thresholds)
 
         # All scores should be in valid range
-        assert 0.0 <= token_result['similarity_score'] <= 1.0
-        assert 0.0 <= ast_result['similarity_score'] <= 1.0
-        assert 0.0 <= hash_result['similarity_score'] <= 1.0
-
+        assert 0.0 <= token_result["similarity_score"] <= 1.0
+        assert 0.0 <= ast_result["similarity_score"] <= 1.0
+        assert 0.0 <= hash_result["similarity_score"] <= 1.0
 
     def test_partial_copy(self, temp_file_pair, all_detectors):
         """
@@ -328,26 +341,26 @@ def another_func():
         file1, file2 = temp_file_pair(code1, code2)
 
         # Act: Run all three detectors
-        token_result = all_detectors['token'].analyze(file1, file2)
-        ast_result = all_detectors['ast'].analyze(file1, file2)
-        hash_result = all_detectors['hash'].analyze(file1, file2)
+        token_result = all_detectors["token"].analyze(file1, file2)
+        ast_result = all_detectors["ast"].analyze(file1, file2)
+        hash_result = all_detectors["hash"].analyze(file1, file2)
 
         # Assert: Hash should detect partial copying better than others
-        assert hash_result['similarity_score'] > 0.2, \
-            f"Hash detector should detect partial copying, got {hash_result['similarity_score']:.2f}"
+        assert (
+            hash_result["similarity_score"] > 0.2
+        ), f"Hash detector should detect partial copying, got {hash_result['similarity_score']:.2f}"
 
         # All detectors should detect some similarity (one function is identical)
-        assert token_result['similarity_score'] > 0.1, \
-            "Token detector should detect some overlap"
+        assert token_result["similarity_score"] > 0.1, "Token detector should detect some overlap"
 
-        assert ast_result['similarity_score'] > 0.1, \
-            "AST detector should detect some structural overlap"
+        assert (
+            ast_result["similarity_score"] > 0.1
+        ), "AST detector should detect some structural overlap"
 
         # All scores should be in valid range
-        assert 0.0 <= token_result['similarity_score'] <= 1.0
-        assert 0.0 <= ast_result['similarity_score'] <= 1.0
-        assert 0.0 <= hash_result['similarity_score'] <= 1.0
-
+        assert 0.0 <= token_result["similarity_score"] <= 1.0
+        assert 0.0 <= ast_result["similarity_score"] <= 1.0
+        assert 0.0 <= hash_result["similarity_score"] <= 1.0
 
     def test_structural_plagiarism(self, all_detectors):
         """
@@ -375,29 +388,31 @@ def another_func():
         assert file2.exists(), f"Validation file not found: {file2}"
 
         # Act: Run all three detectors
-        token_result = all_detectors['token'].analyze(str(file1), str(file2))
-        ast_result = all_detectors['ast'].analyze(str(file1), str(file2))
-        hash_result = all_detectors['hash'].analyze(str(file1), str(file2))
+        token_result = all_detectors["token"].analyze(str(file1), str(file2))
+        ast_result = all_detectors["ast"].analyze(str(file1), str(file2))
+        hash_result = all_detectors["hash"].analyze(str(file1), str(file2))
 
         # Assert: AST should be high (structural similarity despite renaming)
-        assert ast_result['similarity_score'] > 0.7, \
-            f"AST detector should detect structural plagiarism, got {ast_result['similarity_score']:.2f}"
+        assert (
+            ast_result["similarity_score"] > 0.7
+        ), f"AST detector should detect structural plagiarism, got {ast_result['similarity_score']:.2f}"
 
         # Hash detector will show lower similarity with variable renaming
         # The validation dataset has significant renaming, which affects hash fingerprints
-        assert hash_result['similarity_score'] > 0.2, \
-            f"Hash detector should show some similarity, got {hash_result['similarity_score']:.2f}"
+        assert (
+            hash_result["similarity_score"] > 0.2
+        ), f"Hash detector should show some similarity, got {hash_result['similarity_score']:.2f}"
 
         # Key validation: AST similarity should be significantly higher than Hash
         # This demonstrates AST's strength in detecting structural plagiarism
-        assert ast_result['similarity_score'] > hash_result['similarity_score'] + 0.3, \
-            f"AST ({ast_result['similarity_score']:.2f}) should significantly exceed Hash ({hash_result['similarity_score']:.2f})"
+        assert (
+            ast_result["similarity_score"] > hash_result["similarity_score"] + 0.3
+        ), f"AST ({ast_result['similarity_score']:.2f}) should significantly exceed Hash ({hash_result['similarity_score']:.2f})"
 
         # All scores should be in valid range
-        assert 0.0 <= token_result['similarity_score'] <= 1.0
-        assert 0.0 <= ast_result['similarity_score'] <= 1.0
-        assert 0.0 <= hash_result['similarity_score'] <= 1.0
-
+        assert 0.0 <= token_result["similarity_score"] <= 1.0
+        assert 0.0 <= ast_result["similarity_score"] <= 1.0
+        assert 0.0 <= hash_result["similarity_score"] <= 1.0
 
     def test_completely_different(self, temp_file_pair, all_detectors):
         """
@@ -457,35 +472,38 @@ class BinaryTree:
         file1, file2 = temp_file_pair(code1, code2)
 
         # Act: Run all three detectors
-        token_result = all_detectors['token'].analyze(file1, file2)
-        ast_result = all_detectors['ast'].analyze(file1, file2)
-        hash_result = all_detectors['hash'].analyze(file1, file2)
+        token_result = all_detectors["token"].analyze(file1, file2)
+        ast_result = all_detectors["ast"].analyze(file1, file2)
+        hash_result = all_detectors["hash"].analyze(file1, file2)
 
         # Assert: All detectors should show non-plagiarism levels of similarity
         # Note: Even different algorithms may share some basic structural patterns
         # (loops, conditionals, etc.) which can cause moderate similarity scores
         # The key is that none should flag as plagiarism (below their thresholds)
 
-        assert token_result['similarity_score'] < 0.7, \
-            f"Token detector should not flag different code, got {token_result['similarity_score']:.2f}"
+        assert (
+            token_result["similarity_score"] < 0.7
+        ), f"Token detector should not flag different code, got {token_result['similarity_score']:.2f}"
 
         # AST may show moderate similarity due to shared Python constructs (for loops, if statements)
         # but should still be below plagiarism threshold of 0.8
-        assert ast_result['similarity_score'] < 0.8, \
-            f"AST detector should be below plagiarism threshold for different algorithms, got {ast_result['similarity_score']:.2f}"
+        assert (
+            ast_result["similarity_score"] < 0.8
+        ), f"AST detector should be below plagiarism threshold for different algorithms, got {ast_result['similarity_score']:.2f}"
 
-        assert hash_result['similarity_score'] < 0.6, \
-            f"Hash detector should not flag different code, got {hash_result['similarity_score']:.2f}"
+        assert (
+            hash_result["similarity_score"] < 0.6
+        ), f"Hash detector should not flag different code, got {hash_result['similarity_score']:.2f}"
 
         # Verify plagiarism not flagged
-        assert token_result['is_plagiarism'] is False, \
-            "Token detector should not flag different code as plagiarism"
+        assert (
+            token_result["is_plagiarism"] is False
+        ), "Token detector should not flag different code as plagiarism"
 
         # All scores should be in valid range
-        assert 0.0 <= token_result['similarity_score'] <= 1.0
-        assert 0.0 <= ast_result['similarity_score'] <= 1.0
-        assert 0.0 <= hash_result['similarity_score'] <= 1.0
-
+        assert 0.0 <= token_result["similarity_score"] <= 1.0
+        assert 0.0 <= ast_result["similarity_score"] <= 1.0
+        assert 0.0 <= hash_result["similarity_score"] <= 1.0
 
     def test_batch_processing(self, temp_file_pair, all_detectors):
         """
@@ -533,67 +551,61 @@ def bubble_sort(arr):
         # Create temporary files
         file1, file2 = temp_file_pair(code1, code2)
         file3 = None
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False, encoding='utf-8') as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".py", delete=False, encoding="utf-8"
+        ) as f:
             f.write(code3)
             file3 = f.name
 
         try:
             # Act: Generate all pairs and process with all detectors
-            file_pairs = [
-                (file1, file2),
-                (file1, file3),
-                (file2, file3)
-            ]
+            file_pairs = [(file1, file2), (file1, file3), (file2, file3)]
 
-            results = {
-                'token': [],
-                'ast': [],
-                'hash': []
-            }
+            results = {"token": [], "ast": [], "hash": []}
 
             for f1, f2 in file_pairs:
                 # Run all three detectors on each pair
-                token_result = all_detectors['token'].analyze(f1, f2)
-                ast_result = all_detectors['ast'].analyze(f1, f2)
-                hash_result = all_detectors['hash'].analyze(f1, f2)
+                token_result = all_detectors["token"].analyze(f1, f2)
+                ast_result = all_detectors["ast"].analyze(f1, f2)
+                hash_result = all_detectors["hash"].analyze(f1, f2)
 
-                results['token'].append(token_result)
-                results['ast'].append(ast_result)
-                results['hash'].append(hash_result)
+                results["token"].append(token_result)
+                results["ast"].append(ast_result)
+                results["hash"].append(hash_result)
 
             # Assert: All pairs should be processed successfully
-            assert len(results['token']) == 3, "Token detector should process all 3 pairs"
-            assert len(results['ast']) == 3, "AST detector should process all 3 pairs"
-            assert len(results['hash']) == 3, "Hash detector should process all 3 pairs"
+            assert len(results["token"]) == 3, "Token detector should process all 3 pairs"
+            assert len(results["ast"]) == 3, "AST detector should process all 3 pairs"
+            assert len(results["hash"]) == 3, "Hash detector should process all 3 pairs"
 
             # Verify all results have valid similarity scores
             for detector_name, detector_results in results.items():
                 for i, result in enumerate(detector_results):
-                    similarity = result['similarity_score']
-                    assert 0.0 <= similarity <= 1.0, \
-                        f"{detector_name} detector pair {i} has invalid similarity: {similarity}"
+                    similarity = result["similarity_score"]
+                    assert (
+                        0.0 <= similarity <= 1.0
+                    ), f"{detector_name} detector pair {i} has invalid similarity: {similarity}"
 
             # Verify results are consistent (no crashes, all fields present)
-            for result in results['token']:
-                assert 'similarity_score' in result
-                assert 'is_plagiarism' in result
-                assert 'threshold' in result
+            for result in results["token"]:
+                assert "similarity_score" in result
+                assert "is_plagiarism" in result
+                assert "threshold" in result
 
-            for result in results['ast']:
-                assert 'similarity_score' in result
-                assert 'detector' in result
-                assert result['detector'] == 'ast'
+            for result in results["ast"]:
+                assert "similarity_score" in result
+                assert "detector" in result
+                assert result["detector"] == "ast"
 
-            for result in results['hash']:
-                assert 'similarity_score' in result
-                assert 'detector' in result
-                assert result['detector'] == 'hash'
+            for result in results["hash"]:
+                assert "similarity_score" in result
+                assert "detector" in result
+                assert result["detector"] == "hash"
 
         finally:
             # Cleanup: remove the third file
             if file3 and os.path.exists(file3):
                 os.unlink(file3)
-
 
     def test_error_recovery(self, temp_file_pair, all_detectors):
         """
@@ -619,25 +631,26 @@ def bubble_sort(arr):
 
         # All detectors should handle this gracefully
         try:
-            token_result = all_detectors['token'].analyze(file1, file2)
+            token_result = all_detectors["token"].analyze(file1, file2)
             # Should not crash, should return valid similarity (likely 0.0)
-            assert 0.0 <= token_result['similarity_score'] <= 1.0
+            assert 0.0 <= token_result["similarity_score"] <= 1.0
         except Exception as e:
             # Some detectors may raise exceptions, that's acceptable
             pass
 
         try:
-            ast_result = all_detectors['ast'].analyze(file1, file2)
+            ast_result = all_detectors["ast"].analyze(file1, file2)
             # AST parser should handle syntax errors and return 0.0
-            assert ast_result['similarity_score'] == 0.0, \
-                "AST detector should return 0.0 for unparseable code"
+            assert (
+                ast_result["similarity_score"] == 0.0
+            ), "AST detector should return 0.0 for unparseable code"
         except Exception as e:
             pass
 
         try:
-            hash_result = all_detectors['hash'].analyze(file1, file2)
+            hash_result = all_detectors["hash"].analyze(file1, file2)
             # Hash detector should handle partial tokenization
-            assert 0.0 <= hash_result['similarity_score'] <= 1.0
+            assert 0.0 <= hash_result["similarity_score"] <= 1.0
         except Exception as e:
             pass
 
@@ -646,22 +659,24 @@ def bubble_sort(arr):
         file3, file4 = temp_file_pair(empty_code, empty_code)
 
         try:
-            token_result = all_detectors['token'].analyze(file3, file4)
-            assert 0.0 <= token_result['similarity_score'] <= 1.0
+            token_result = all_detectors["token"].analyze(file3, file4)
+            assert 0.0 <= token_result["similarity_score"] <= 1.0
         except Exception:
             pass
 
         try:
-            ast_result = all_detectors['ast'].analyze(file3, file4)
-            assert ast_result['similarity_score'] == 0.0, \
-                "AST detector should return 0.0 for empty files"
+            ast_result = all_detectors["ast"].analyze(file3, file4)
+            assert (
+                ast_result["similarity_score"] == 0.0
+            ), "AST detector should return 0.0 for empty files"
         except Exception:
             pass
 
         try:
-            hash_result = all_detectors['hash'].analyze(file3, file4)
-            assert hash_result['similarity_score'] == 0.0, \
-                "Hash detector should return 0.0 for empty files"
+            hash_result = all_detectors["hash"].analyze(file3, file4)
+            assert (
+                hash_result["similarity_score"] == 0.0
+            ), "Hash detector should return 0.0 for empty files"
         except Exception:
             pass
 
@@ -689,9 +704,6 @@ if __name__ == "__main__":
     print("Running integration tests for all three detectors...")
     print("=" * 80)
 
-    result = subprocess.run(
-        ["pytest", __file__, "-v", "--tb=short"],
-        capture_output=False
-    )
+    result = subprocess.run(["pytest", __file__, "-v", "--tb=short"], capture_output=False)
 
     exit(result.returncode)

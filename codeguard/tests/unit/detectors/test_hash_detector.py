@@ -16,7 +16,8 @@ from pathlib import Path
 
 # Import the detector
 import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'src'))
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "src"))
 from detectors.hash_detector import HashDetector
 
 
@@ -68,10 +69,10 @@ class TestTokenization:
         tokens = detector._tokenize(code)
 
         # Should contain: def, add, (, a, ,, b, ), :, return, a, +, b
-        assert 'def' in tokens
-        assert 'add' in tokens
-        assert 'return' in tokens
-        assert '+' in tokens
+        assert "def" in tokens
+        assert "add" in tokens
+        assert "return" in tokens
+        assert "+" in tokens
         assert len(tokens) > 0
 
     def test_tokenization_filters_comments(self):
@@ -86,10 +87,10 @@ def foo():
         tokens = detector._tokenize(code)
 
         # Comments should not be in tokens
-        assert 'This' not in tokens
-        assert 'comment' not in tokens
-        assert 'def' in tokens
-        assert 'foo' in tokens
+        assert "This" not in tokens
+        assert "comment" not in tokens
+        assert "def" in tokens
+        assert "foo" in tokens
 
     def test_tokenization_empty_code(self):
         """Test tokenization of empty code."""
@@ -113,28 +114,24 @@ class TestKGramGeneration:
     def test_basic_kgram_generation(self):
         """Test basic k-gram generation."""
         detector = HashDetector(k=3)
-        tokens = ['a', 'b', 'c', 'd', 'e']
+        tokens = ["a", "b", "c", "d", "e"]
         kgrams = detector._generate_kgrams(tokens, 3)
 
-        expected = [
-            ('a', 'b', 'c'),
-            ('b', 'c', 'd'),
-            ('c', 'd', 'e')
-        ]
+        expected = [("a", "b", "c"), ("b", "c", "d"), ("c", "d", "e")]
         assert kgrams == expected
 
     def test_kgram_generation_exact_k(self):
         """Test k-gram generation when token count equals k."""
         detector = HashDetector(k=3)
-        tokens = ['a', 'b', 'c']
+        tokens = ["a", "b", "c"]
         kgrams = detector._generate_kgrams(tokens, 3)
 
-        assert kgrams == [('a', 'b', 'c')]
+        assert kgrams == [("a", "b", "c")]
 
     def test_kgram_generation_insufficient_tokens(self):
         """Test k-gram generation with fewer tokens than k."""
         detector = HashDetector(k=5)
-        tokens = ['a', 'b', 'c']
+        tokens = ["a", "b", "c"]
         kgrams = detector._generate_kgrams(tokens, 5)
 
         assert kgrams == []
@@ -142,10 +139,10 @@ class TestKGramGeneration:
     def test_kgram_generation_k_equals_1(self):
         """Test k-gram generation with k=1."""
         detector = HashDetector(k=1)
-        tokens = ['a', 'b', 'c']
+        tokens = ["a", "b", "c"]
         kgrams = detector._generate_kgrams(tokens, 1)
 
-        expected = [('a',), ('b',), ('c',)]
+        expected = [("a",), ("b",), ("c",)]
         assert kgrams == expected
 
 
@@ -155,7 +152,7 @@ class TestHashing:
     def test_hash_produces_integers(self):
         """Test that hashing produces integer values."""
         detector = HashDetector()
-        kgrams = [('a', 'b', 'c'), ('b', 'c', 'd')]
+        kgrams = [("a", "b", "c"), ("b", "c", "d")]
         hashes = detector._hash_kgrams(kgrams)
 
         assert len(hashes) == 2
@@ -164,7 +161,7 @@ class TestHashing:
     def test_hash_consistency(self):
         """Test that same k-gram produces same hash."""
         detector = HashDetector()
-        kgram = ('def', 'foo', '(')
+        kgram = ("def", "foo", "(")
 
         hash1 = detector._hash_kgrams([kgram])[0]
         hash2 = detector._hash_kgrams([kgram])[0]
@@ -174,11 +171,7 @@ class TestHashing:
     def test_hash_uniqueness(self):
         """Test that different k-grams produce different hashes (usually)."""
         detector = HashDetector()
-        kgrams = [
-            ('a', 'b', 'c'),
-            ('d', 'e', 'f'),
-            ('g', 'h', 'i')
-        ]
+        kgrams = [("a", "b", "c"), ("d", "e", "f"), ("g", "h", "i")]
         hashes = detector._hash_kgrams(kgrams)
 
         # With MD5, collisions are extremely rare for different inputs
@@ -352,11 +345,11 @@ def fibonacci(n):
         return n
     return fibonacci(n-1) + fibonacci(n-2)
 """
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f1:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f1:
             f1.write(code)
             file1 = f1.name
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f2:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f2:
             f2.write(code)
             file2 = f2.name
 
@@ -364,15 +357,15 @@ def fibonacci(n):
             detector = HashDetector()
             result = detector.analyze(file1, file2)
 
-            assert result['similarity_score'] == 1.0
-            assert result['detector'] == 'hash'
-            assert result['file1'] == file1
-            assert result['file2'] == file2
-            assert result['k'] == 5
-            assert result['w'] == 4
-            assert result['file1_fingerprints'] > 0
-            assert result['file2_fingerprints'] > 0
-            assert result['common_fingerprints'] == result['file1_fingerprints']
+            assert result["similarity_score"] == 1.0
+            assert result["detector"] == "hash"
+            assert result["file1"] == file1
+            assert result["file2"] == file2
+            assert result["k"] == 5
+            assert result["w"] == 4
+            assert result["file1_fingerprints"] > 0
+            assert result["file2_fingerprints"] > 0
+            assert result["common_fingerprints"] == result["file1_fingerprints"]
 
         finally:
             os.unlink(file1)
@@ -383,11 +376,11 @@ def fibonacci(n):
         code1 = "def foo():\n    return 1"
         code2 = "class Bar:\n    def __init__(self):\n        self.x = 10"
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f1:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f1:
             f1.write(code1)
             file1 = f1.name
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f2:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f2:
             f2.write(code2)
             file2 = f2.name
 
@@ -395,8 +388,8 @@ def fibonacci(n):
             detector = HashDetector()
             result = detector.analyze(file1, file2)
 
-            assert result['similarity_score'] < 0.3
-            assert result['detector'] == 'hash'
+            assert result["similarity_score"] < 0.3
+            assert result["detector"] == "hash"
 
         finally:
             os.unlink(file1)
@@ -407,7 +400,7 @@ def fibonacci(n):
         detector = HashDetector()
 
         with pytest.raises(FileNotFoundError):
-            detector.analyze('nonexistent1.py', 'nonexistent2.py')
+            detector.analyze("nonexistent1.py", "nonexistent2.py")
 
 
 class TestScatteredCopying:
@@ -528,5 +521,5 @@ class TestEdgeCases:
         assert similarity == 0.0
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

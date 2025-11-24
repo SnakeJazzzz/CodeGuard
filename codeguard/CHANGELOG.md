@@ -8,12 +8,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### To Be Implemented
-- Code quality improvements (formatting and linting)
-- Test coverage increase (68% → 80%)
-- Database test fixes (35 failing tests)
-- Precision/Recall validation measurement
 - Performance benchmarking
-- Deployment preparation
+- User acceptance testing
+- Docker deployment finalization
+- Final documentation polish
+
+---
+
+## [0.5.0] - 2025-11-24 (Week 12)
+
+### Added
+- Professional UI redesign with custom CSS and academic color scheme
+- "How It Works" educational tab with comprehensive detector explanations
+- 12 additional validation dataset files (1,882 lines of test code)
+  - 6 new plagiarism pairs (binary_search, quicksort, fibonacci, gcd_calculator, linear_search, prime_checker)
+  - Increased total validation files from 6 to 18
+- Accuracy measurement script (scripts/measure_accuracy.py)
+- Comprehensive accuracy report (docs/ACCURACY_REPORT.md, 145 lines)
+- Professional success notifications (removed balloon animations)
+- Quick-start user guide (docs/user-guide/quick-start.md, 365 lines)
+- CSV export functionality replacing JSON export
+- Shield emoji and tagline in header branding
+
+### Changed
+- Replaced JSON export with CSV-only export for improved usability
+- Reorganized sidebar controls into collapsible expanders
+  - Detection Thresholds expander
+  - Detector Weights expander
+  - Decision Threshold as standalone slider
+- Removed database connection status indicator from UI (internal only)
+- Removed detector explanations from sidebar (moved to "How It Works" tab)
+- Updated header with professional branding and tagline
+- Improved error handling and user feedback messages
+
+### Fixed
+- 35 broken database tests (function signature mismatches with operations.py)
+- Applied Black formatting to 22 files for code consistency
+- Fixed 80+ linting issues identified by flake8
+  - Unused imports removal
+  - Line spacing normalization
+  - Boolean comparison improvements (== True/False)
+- Cleaned up unused variables across codebase
+- Corrected test expectations in validation suite
+
+### Performance
+- Achieved 100% precision on 12 test cases (Target: ≥85%)
+- Achieved 100% recall on 12 test cases (Target: ≥80%)
+- Achieved 100% F1 score on 12 test cases (Target: ≥82%)
+- All 417 tests passing (100% pass rate, up from 91.6%)
+- Test coverage: 72% (up from 68%)
+
+### Documentation
+- Updated README.md with Project Status and Accuracy Results sections
+- Created comprehensive quick-start user guide (365 lines)
+- Created accuracy validation report (145 lines)
+- Updated project_status.md to reflect 90% completion
+- Updated CHANGELOG.md with Week 12 accomplishments
+- All documentation suitable for academic submission
 
 ---
 

@@ -65,10 +65,10 @@ class HashDetector:
 
     # Token types that carry semantic meaning (same as TokenDetector)
     SEMANTIC_TOKEN_TYPES = {
-        tokenize.NAME,       # Identifiers (variable names, function names, keywords)
-        tokenize.NUMBER,     # Numeric literals
-        tokenize.STRING,     # String literals
-        tokenize.OP,         # Operators (+, -, *, /, etc.)
+        tokenize.NAME,  # Identifiers (variable names, function names, keywords)
+        tokenize.NUMBER,  # Numeric literals
+        tokenize.STRING,  # String literals
+        tokenize.OP,  # Operators (+, -, *, /, etc.)
     }
 
     def __init__(self, threshold: float = 0.6, k: int = 5, w: int = 4):
@@ -123,7 +123,7 @@ class HashDetector:
             raise FileNotFoundError(f"File not found: {file_path}")
 
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 return f.read()
         except Exception as e:
             raise IOError(f"Error reading file {file_path}: {str(e)}")
@@ -153,7 +153,7 @@ class HashDetector:
 
         try:
             # Convert source code string to bytes for tokenizer
-            source_bytes = source.encode('utf-8')
+            source_bytes = source.encode("utf-8")
             readline = io.BytesIO(source_bytes).readline
 
             # Tokenize the source code
@@ -209,7 +209,7 @@ class HashDetector:
 
         # Slide window of size k across the token sequence
         for i in range(len(tokens) - k + 1):
-            kgram = tuple(tokens[i:i + k])
+            kgram = tuple(tokens[i : i + k])
             kgrams.append(kgram)
 
         return kgrams
@@ -237,10 +237,10 @@ class HashDetector:
         for kgram in kgrams:
             # Join k-gram tokens into a single string
             # Use a separator to avoid collision (e.g., ('a','bc') vs ('ab','c'))
-            kgram_str = '\x00'.join(kgram)
+            kgram_str = "\x00".join(kgram)
 
             # Hash using MD5 (fast, good distribution)
-            hash_obj = hashlib.md5(kgram_str.encode('utf-8'))
+            hash_obj = hashlib.md5(kgram_str.encode("utf-8"))
 
             # Convert hex digest to integer for numeric comparison
             hash_val = int(hash_obj.hexdigest(), 16)
@@ -289,7 +289,7 @@ class HashDetector:
 
         # Slide window of size w across the hash sequence
         for i in range(len(hashes) - w + 1):
-            window = hashes[i:i + w]
+            window = hashes[i : i + w]
 
             # Find the minimum hash value in this window
             min_hash = min(window)
@@ -419,15 +419,15 @@ class HashDetector:
 
         # Prepare detailed result dictionary
         result = {
-            'similarity_score': similarity_score,
-            'file1': str(file1_path),
-            'file2': str(file2_path),
-            'file1_fingerprints': len(fingerprints1),
-            'file2_fingerprints': len(fingerprints2),
-            'common_fingerprints': common_fingerprints,
-            'k': self.k,
-            'w': self.w,
-            'detector': 'hash'
+            "similarity_score": similarity_score,
+            "file1": str(file1_path),
+            "file2": str(file2_path),
+            "file1_fingerprints": len(fingerprints1),
+            "file2_fingerprints": len(fingerprints2),
+            "common_fingerprints": common_fingerprints,
+            "k": self.k,
+            "w": self.w,
+            "detector": "hash",
         }
 
         return result

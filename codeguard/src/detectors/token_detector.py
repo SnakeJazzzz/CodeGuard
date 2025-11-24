@@ -14,10 +14,9 @@ Author: CodeGuard Team
 
 import io
 import tokenize
-import keyword
 from collections import Counter
 from pathlib import Path
-from typing import Dict, List, Set, Tuple, Union
+from typing import Dict, List, Union
 import math
 
 
@@ -42,10 +41,10 @@ class TokenDetector:
 
     # Token types that carry semantic meaning (exclude formatting/whitespace)
     SEMANTIC_TOKEN_TYPES = {
-        tokenize.NAME,       # Identifiers (variable names, function names, keywords)
-        tokenize.NUMBER,     # Numeric literals
-        tokenize.STRING,     # String literals
-        tokenize.OP,         # Operators (+, -, *, /, etc.)
+        tokenize.NAME,  # Identifiers (variable names, function names, keywords)
+        tokenize.NUMBER,  # Numeric literals
+        tokenize.STRING,  # String literals
+        tokenize.OP,  # Operators (+, -, *, /, etc.)
     }
 
     def __init__(self, threshold: float = 0.7):
@@ -84,7 +83,7 @@ class TokenDetector:
             raise FileNotFoundError(f"File not found: {file_path}")
 
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 return f.read()
         except Exception as e:
             raise IOError(f"Error reading file {file_path}: {str(e)}")
@@ -113,7 +112,7 @@ class TokenDetector:
 
         try:
             # Convert source code string to bytes for tokenizer
-            source_bytes = source_code.encode('utf-8')
+            source_bytes = source_code.encode("utf-8")
             readline = io.BytesIO(source_bytes).readline
 
             # Tokenize the source code
@@ -129,11 +128,11 @@ class TokenDetector:
                     normalized_token = token_string.lower()
                     tokens.append(normalized_token)
 
-        except tokenize.TokenError as e:
+        except tokenize.TokenError:
             # Handle incomplete or malformed Python code
             # Return tokens collected so far
             pass
-        except Exception as e:
+        except Exception:
             # Handle other tokenization errors gracefully
             # Return empty list for completely invalid code
             pass
@@ -210,12 +209,11 @@ class TokenDetector:
         all_tokens = set(freq1.keys()).union(set(freq2.keys()))
 
         # Calculate dot product
-        dot_product = sum(freq1.get(token, 0) * freq2.get(token, 0)
-                         for token in all_tokens)
+        dot_product = sum(freq1.get(token, 0) * freq2.get(token, 0) for token in all_tokens)
 
         # Calculate magnitudes (L2 norm)
-        magnitude1 = math.sqrt(sum(count ** 2 for count in freq1.values()))
-        magnitude2 = math.sqrt(sum(count ** 2 for count in freq2.values()))
+        magnitude1 = math.sqrt(sum(count**2 for count in freq1.values()))
+        magnitude2 = math.sqrt(sum(count**2 for count in freq2.values()))
 
         # Handle edge case: zero magnitude
         if magnitude1 == 0.0 or magnitude2 == 0.0:
@@ -287,18 +285,18 @@ class TokenDetector:
 
         # Prepare detailed result dictionary
         result = {
-            'similarity_score': similarity_score,
-            'is_plagiarism': is_plagiarism,
-            'threshold': self.threshold,
-            'jaccard_similarity': jaccard_sim,
-            'cosine_similarity': cosine_sim,
-            'details': {
-                'file1_tokens': len(tokens1),
-                'file2_tokens': len(tokens2),
-                'common_tokens': len(common_tokens),
-                'file1_path': str(file1_path),
-                'file2_path': str(file2_path),
-            }
+            "similarity_score": similarity_score,
+            "is_plagiarism": is_plagiarism,
+            "threshold": self.threshold,
+            "jaccard_similarity": jaccard_sim,
+            "cosine_similarity": cosine_sim,
+            "details": {
+                "file1_tokens": len(tokens1),
+                "file2_tokens": len(tokens2),
+                "common_tokens": len(common_tokens),
+                "file1_path": str(file1_path),
+                "file2_path": str(file2_path),
+            },
         }
 
         return result

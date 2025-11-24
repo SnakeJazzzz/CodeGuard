@@ -47,6 +47,7 @@ logger = logging.getLogger(__name__)
 # Database Fixtures
 # =============================================================================
 
+
 @pytest.fixture(scope="function")
 def db_session() -> Generator[sqlite3.Connection, None, None]:
     """
@@ -72,10 +73,7 @@ def db_session() -> Generator[sqlite3.Connection, None, None]:
         - Row factory set for dict-like access
     """
     # Create in-memory database connection
-    conn = sqlite3.connect(
-        ':memory:',
-        check_same_thread=False
-    )
+    conn = sqlite3.connect(":memory:", check_same_thread=False)
 
     try:
         # Enable foreign key constraints
@@ -86,13 +84,14 @@ def db_session() -> Generator[sqlite3.Connection, None, None]:
 
         # Read and execute schema
         if SCHEMA_PATH.exists():
-            schema_sql = SCHEMA_PATH.read_text(encoding='utf-8')
+            schema_sql = SCHEMA_PATH.read_text(encoding="utf-8")
             conn.executescript(schema_sql)
             conn.commit()
         else:
             logger.warning(f"Schema file not found at {SCHEMA_PATH}, creating minimal schema")
             # Minimal fallback schema if file not found
-            conn.executescript("""
+            conn.executescript(
+                """
                 CREATE TABLE IF NOT EXISTS analysis_jobs (
                     id TEXT PRIMARY KEY,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -121,7 +120,8 @@ def db_session() -> Generator[sqlite3.Connection, None, None]:
                     value TEXT NOT NULL,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-            """)
+            """
+            )
             conn.commit()
 
         logger.debug("In-memory test database initialized")
@@ -138,6 +138,7 @@ def db_session() -> Generator[sqlite3.Connection, None, None]:
 # =============================================================================
 # Sample Code Data Fixtures
 # =============================================================================
+
 
 @pytest.fixture(scope="session")
 def sample_code_pairs() -> Dict[str, Dict[str, Any]]:
@@ -170,83 +171,78 @@ def sample_code_pairs() -> Dict[str, Dict[str, Any]]:
         - description: Description of the test case
     """
     return {
-        'identical': {
-            'code1': """def factorial(n):
+        "identical": {
+            "code1": """def factorial(n):
     '''Calculate factorial of n.'''
     if n <= 1:
         return 1
     return n * factorial(n - 1)
 """,
-            'code2': """def factorial(n):
+            "code2": """def factorial(n):
     '''Calculate factorial of n.'''
     if n <= 1:
         return 1
     return n * factorial(n - 1)
 """,
-            'expected_similarity': 1.0,
-            'description': 'Exact identical code'
+            "expected_similarity": 1.0,
+            "description": "Exact identical code",
         },
-
-        'renamed': {
-            'code1': """def calculate_sum(numbers):
+        "renamed": {
+            "code1": """def calculate_sum(numbers):
     total = 0
     for num in numbers:
         total += num
     return total
 """,
-            'code2': """def compute_total(values):
+            "code2": """def compute_total(values):
     result = 0
     for val in values:
         result += val
     return result
 """,
-            'expected_similarity': 0.8,
-            'description': 'Same structure, renamed variables and functions'
+            "expected_similarity": 0.8,
+            "description": "Same structure, renamed variables and functions",
         },
-
-        'different': {
-            'code1': """def add(a, b):
+        "different": {
+            "code1": """def add(a, b):
     return a + b
 """,
-            'code2': """def multiply(x, y):
+            "code2": """def multiply(x, y):
     result = x
     for _ in range(y - 1):
         result += x
     return result
 """,
-            'expected_similarity': 0.2,
-            'description': 'Completely different algorithms'
+            "expected_similarity": 0.2,
+            "description": "Completely different algorithms",
         },
-
-        'similar_structure': {
-            'code1': """for i in range(10):
+        "similar_structure": {
+            "code1": """for i in range(10):
     print(i)
 """,
-            'code2': """for j in range(10):
+            "code2": """for j in range(10):
     print(j)
 """,
-            'expected_similarity': 0.9,
-            'description': 'Identical structure with variable renaming'
+            "expected_similarity": 0.9,
+            "description": "Identical structure with variable renaming",
         },
-
-        'with_comments': {
-            'code1': """# This is a comment
+        "with_comments": {
+            "code1": """# This is a comment
 # Another comment
 def foo():
     '''Docstring here'''
     # Inline comment
     pass
 """,
-            'code2': """def foo():
+            "code2": """def foo():
     '''Docstring here'''
     pass
 """,
-            'expected_similarity': 1.0,
-            'description': 'Same code with/without comments'
+            "expected_similarity": 1.0,
+            "description": "Same code with/without comments",
         },
-
-        'partial_copy': {
-            'code1': """def process_data(data):
+        "partial_copy": {
+            "code1": """def process_data(data):
     cleaned = []
     for item in data:
         if item is not None:
@@ -257,7 +253,7 @@ def save_to_file(data, filename):
     with open(filename, 'w') as f:
         f.write('\\n'.join(data))
 """,
-            'code2': """def process_data(data):
+            "code2": """def process_data(data):
     cleaned = []
     for item in data:
         if item is not None:
@@ -267,42 +263,40 @@ def save_to_file(data, filename):
 def different_function(x):
     return x * 2
 """,
-            'expected_similarity': 0.5,
-            'description': 'Partial code copying (one function identical, one different)'
+            "expected_similarity": 0.5,
+            "description": "Partial code copying (one function identical, one different)",
         },
-
-        'whitespace_diff': {
-            'code1': """def greet(name):
+        "whitespace_diff": {
+            "code1": """def greet(name):
     return f"Hello, {name}!"
 """,
-            'code2': """def greet(name):
+            "code2": """def greet(name):
 
 
     return f"Hello, {name}!"
 """,
-            'expected_similarity': 1.0,
-            'description': 'Only whitespace differences'
+            "expected_similarity": 1.0,
+            "description": "Only whitespace differences",
         },
-
-        'empty': {
-            'code1': '',
-            'code2': '',
-            'expected_similarity': 1.0,
-            'description': 'Both empty strings'
+        "empty": {
+            "code1": "",
+            "code2": "",
+            "expected_similarity": 1.0,
+            "description": "Both empty strings",
         },
-
-        'one_empty': {
-            'code1': 'def foo(): pass',
-            'code2': '',
-            'expected_similarity': 0.0,
-            'description': 'One empty, one with code'
-        }
+        "one_empty": {
+            "code1": "def foo(): pass",
+            "code2": "",
+            "expected_similarity": 0.0,
+            "description": "One empty, one with code",
+        },
     }
 
 
 # =============================================================================
 # Temporary Directory Fixtures
 # =============================================================================
+
 
 @pytest.fixture(scope="function")
 def temp_upload_dir() -> Generator[Path, None, None]:
@@ -329,7 +323,7 @@ def temp_upload_dir() -> Generator[Path, None, None]:
         - Safe for parallel test execution (unique per test)
     """
     # Create temporary directory
-    temp_dir = Path(tempfile.mkdtemp(prefix='codeguard_test_'))
+    temp_dir = Path(tempfile.mkdtemp(prefix="codeguard_test_"))
 
     try:
         logger.debug(f"Created temporary directory: {temp_dir}")
@@ -345,6 +339,7 @@ def temp_upload_dir() -> Generator[Path, None, None]:
 # =============================================================================
 # Mock Data Fixtures
 # =============================================================================
+
 
 @pytest.fixture(scope="function")
 def mock_analysis_job(db_session: sqlite3.Connection) -> Dict[str, Any]:
@@ -384,8 +379,8 @@ def mock_analysis_job(db_session: sqlite3.Connection) -> Dict[str, Any]:
         - results: List of comparison results
     """
     # Generate unique job ID
-    timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')
-    job_id = f'test-job-{timestamp}'
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S_%f")
+    job_id = f"test-job-{timestamp}"
 
     # Create analysis job in database
     db_session.execute(
@@ -393,7 +388,7 @@ def mock_analysis_job(db_session: sqlite3.Connection) -> Dict[str, Any]:
         INSERT INTO analysis_jobs (id, status, file_count, pair_count, results_path)
         VALUES (?, ?, ?, ?, ?)
         """,
-        (job_id, 'completed', 5, 10, f'data/results/analysis_{job_id}.json')
+        (job_id, "completed", 5, 10, f"data/results/analysis_{job_id}.json"),
     )
     db_session.commit()
 
@@ -401,66 +396,66 @@ def mock_analysis_job(db_session: sqlite3.Connection) -> Dict[str, Any]:
     results = [
         # Plagiarized pairs
         {
-            'job_id': job_id,
-            'file1_name': 'student1.py',
-            'file2_name': 'student2.py',
-            'token_similarity': 0.95,
-            'ast_similarity': 0.98,
-            'hash_similarity': 0.92,
-            'is_plagiarized': True,
-            'confidence_score': 0.95
+            "job_id": job_id,
+            "file1_name": "student1.py",
+            "file2_name": "student2.py",
+            "token_similarity": 0.95,
+            "ast_similarity": 0.98,
+            "hash_similarity": 0.92,
+            "is_plagiarized": True,
+            "confidence_score": 0.95,
         },
         {
-            'job_id': job_id,
-            'file1_name': 'student1.py',
-            'file2_name': 'student3.py',
-            'token_similarity': 0.88,
-            'ast_similarity': 0.91,
-            'hash_similarity': 0.85,
-            'is_plagiarized': True,
-            'confidence_score': 0.88
+            "job_id": job_id,
+            "file1_name": "student1.py",
+            "file2_name": "student3.py",
+            "token_similarity": 0.88,
+            "ast_similarity": 0.91,
+            "hash_similarity": 0.85,
+            "is_plagiarized": True,
+            "confidence_score": 0.88,
         },
         {
-            'job_id': job_id,
-            'file1_name': 'student2.py',
-            'file2_name': 'student3.py',
-            'token_similarity': 0.90,
-            'ast_similarity': 0.94,
-            'hash_similarity': 0.87,
-            'is_plagiarized': True,
-            'confidence_score': 0.90
+            "job_id": job_id,
+            "file1_name": "student2.py",
+            "file2_name": "student3.py",
+            "token_similarity": 0.90,
+            "ast_similarity": 0.94,
+            "hash_similarity": 0.87,
+            "is_plagiarized": True,
+            "confidence_score": 0.90,
         },
         # Clean pairs
         {
-            'job_id': job_id,
-            'file1_name': 'student1.py',
-            'file2_name': 'student4.py',
-            'token_similarity': 0.25,
-            'ast_similarity': 0.30,
-            'hash_similarity': 0.20,
-            'is_plagiarized': False,
-            'confidence_score': 0.25
+            "job_id": job_id,
+            "file1_name": "student1.py",
+            "file2_name": "student4.py",
+            "token_similarity": 0.25,
+            "ast_similarity": 0.30,
+            "hash_similarity": 0.20,
+            "is_plagiarized": False,
+            "confidence_score": 0.25,
         },
         {
-            'job_id': job_id,
-            'file1_name': 'student1.py',
-            'file2_name': 'student5.py',
-            'token_similarity': 0.15,
-            'ast_similarity': 0.18,
-            'hash_similarity': 0.12,
-            'is_plagiarized': False,
-            'confidence_score': 0.15
+            "job_id": job_id,
+            "file1_name": "student1.py",
+            "file2_name": "student5.py",
+            "token_similarity": 0.15,
+            "ast_similarity": 0.18,
+            "hash_similarity": 0.12,
+            "is_plagiarized": False,
+            "confidence_score": 0.15,
         },
         {
-            'job_id': job_id,
-            'file1_name': 'student4.py',
-            'file2_name': 'student5.py',
-            'token_similarity': 0.22,
-            'ast_similarity': 0.25,
-            'hash_similarity': 0.19,
-            'is_plagiarized': False,
-            'confidence_score': 0.22
-        }
+            "job_id": job_id,
+            "file1_name": "student4.py",
+            "file2_name": "student5.py",
+            "token_similarity": 0.22,
+            "ast_similarity": 0.25,
+            "hash_similarity": 0.19,
+            "is_plagiarized": False,
+            "confidence_score": 0.22,
+        },
     ]
 
     # Insert results into database
@@ -475,15 +470,15 @@ def mock_analysis_job(db_session: sqlite3.Connection) -> Dict[str, Any]:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                result['job_id'],
-                result['file1_name'],
-                result['file2_name'],
-                result['token_similarity'],
-                result['ast_similarity'],
-                result['hash_similarity'],
-                1 if result['is_plagiarized'] else 0,
-                result['confidence_score']
-            )
+                result["job_id"],
+                result["file1_name"],
+                result["file2_name"],
+                result["token_similarity"],
+                result["ast_similarity"],
+                result["hash_similarity"],
+                1 if result["is_plagiarized"] else 0,
+                result["confidence_score"],
+            ),
         )
     db_session.commit()
 
@@ -491,19 +486,20 @@ def mock_analysis_job(db_session: sqlite3.Connection) -> Dict[str, Any]:
 
     # Return job details
     return {
-        'id': job_id,
-        'status': 'completed',
-        'file_count': 5,
-        'pair_count': 10,
-        'created_at': datetime.utcnow().isoformat(),
-        'results_path': f'data/results/analysis_{job_id}.json',
-        'results': results
+        "id": job_id,
+        "status": "completed",
+        "file_count": 5,
+        "pair_count": 10,
+        "created_at": datetime.utcnow().isoformat(),
+        "results_path": f"data/results/analysis_{job_id}.json",
+        "results": results,
     }
 
 
 # =============================================================================
 # Sample File Fixtures
 # =============================================================================
+
 
 @pytest.fixture(scope="function")
 def sample_python_files(temp_upload_dir: Path) -> List[Path]:
@@ -538,8 +534,9 @@ def sample_python_files(temp_upload_dir: Path) -> List[Path]:
     files = []
 
     # File 1: Factorial implementation
-    file1 = temp_upload_dir / 'student1.py'
-    file1.write_text("""def factorial(n):
+    file1 = temp_upload_dir / "student1.py"
+    file1.write_text(
+        """def factorial(n):
     '''Calculate factorial of n using recursion.'''
     if n <= 1:
         return 1
@@ -551,12 +548,14 @@ def main():
 
 if __name__ == "__main__":
     main()
-""")
+"""
+    )
     files.append(file1)
 
     # File 2: Factorial copy with renamed variables (plagiarism)
-    file2 = temp_upload_dir / 'student2.py'
-    file2.write_text("""def calc_factorial(num):
+    file2 = temp_upload_dir / "student2.py"
+    file2.write_text(
+        """def calc_factorial(num):
     '''Calculate factorial using recursion.'''
     if num <= 1:
         return 1
@@ -568,12 +567,14 @@ def run():
 
 if __name__ == "__main__":
     run()
-""")
+"""
+    )
     files.append(file2)
 
     # File 3: Fibonacci implementation (different)
-    file3 = temp_upload_dir / 'student3.py'
-    file3.write_text("""def fibonacci(n):
+    file3 = temp_upload_dir / "student3.py"
+    file3.write_text(
+        """def fibonacci(n):
     '''Calculate nth Fibonacci number.'''
     if n <= 1:
         return n
@@ -588,12 +589,14 @@ def main():
 
 if __name__ == "__main__":
     main()
-""")
+"""
+    )
     files.append(file3)
 
     # File 4: Sorting implementation
-    file4 = temp_upload_dir / 'student4.py'
-    file4.write_text("""def bubble_sort(arr):
+    file4 = temp_upload_dir / "student4.py"
+    file4.write_text(
+        """def bubble_sort(arr):
     '''Sort array using bubble sort.'''
     n = len(arr)
     for i in range(n):
@@ -609,11 +612,12 @@ def main():
 
 if __name__ == "__main__":
     main()
-""")
+"""
+    )
     files.append(file4)
 
     # File 5: Empty file (edge case)
-    file5 = temp_upload_dir / 'student5.py'
+    file5 = temp_upload_dir / "student5.py"
     file5.write_text("")
     files.append(file5)
 
@@ -625,6 +629,7 @@ if __name__ == "__main__":
 # =============================================================================
 # Configuration Fixtures
 # =============================================================================
+
 
 @pytest.fixture(scope="session")
 def test_config() -> Dict[str, Any]:
@@ -669,36 +674,32 @@ def test_config() -> Dict[str, Any]:
     """
     return {
         # Detector thresholds (0.0-1.0)
-        'token_threshold': 0.7,
-        'ast_threshold': 0.8,
-        'hash_threshold': 0.6,
-
+        "token_threshold": 0.7,
+        "ast_threshold": 0.8,
+        "hash_threshold": 0.6,
         # Voting weights
-        'token_weight': 1.0,
-        'ast_weight': 2.0,
-        'hash_weight': 1.5,
-
+        "token_weight": 1.0,
+        "ast_weight": 2.0,
+        "hash_weight": 1.5,
         # Decision threshold
-        'decision_threshold': 0.5,
-
+        "decision_threshold": 0.5,
         # File limits
-        'max_file_size': 16 * 1024 * 1024,  # 16MB in bytes
-        'allowed_extensions': ['.py'],
-        'min_files': 2,
-        'max_files': 100,
-
+        "max_file_size": 16 * 1024 * 1024,  # 16MB in bytes
+        "allowed_extensions": [".py"],
+        "min_files": 2,
+        "max_files": 100,
         # Performance limits
-        'analysis_timeout': 300,  # 5 minutes in seconds
-
+        "analysis_timeout": 300,  # 5 minutes in seconds
         # K-gram settings (for hash detector)
-        'kgram_size': 5,
-        'window_size': 4
+        "kgram_size": 5,
+        "window_size": 4,
     }
 
 
 # =============================================================================
 # Utility Fixtures
 # =============================================================================
+
 
 @pytest.fixture(scope="function")
 def capture_logs() -> Generator[List[logging.LogRecord], None, None]:
@@ -756,6 +757,7 @@ def capture_logs() -> Generator[List[logging.LogRecord], None, None]:
 # Session-Level Setup/Teardown
 # =============================================================================
 
+
 def pytest_configure(config):
     """
     Pytest hook called before test collection.
@@ -768,8 +770,8 @@ def pytest_configure(config):
     # Configure logging for tests
     logging.basicConfig(
         level=logging.DEBUG,
-        format='%(asctime)s [%(levelname)8s] %(name)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+        format="%(asctime)s [%(levelname)8s] %(name)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
 
     logger.info("Test session starting")

@@ -21,7 +21,7 @@ Author: CodeGuard Team
 
 import ast
 from pathlib import Path
-from typing import Dict, List, Set, Union, Any, Optional
+from typing import Dict, List, Union, Optional
 
 
 class ASTDetector:
@@ -54,20 +54,22 @@ class ASTDetector:
     # AST node types that represent control flow structures
     # These are key indicators of algorithmic structure
     CONTROL_FLOW_NODES = {
-        ast.If, ast.For, ast.While, ast.With, ast.Try,
-        ast.ExceptHandler, ast.Match, ast.AsyncFor, ast.AsyncWith
+        ast.If,
+        ast.For,
+        ast.While,
+        ast.With,
+        ast.Try,
+        ast.ExceptHandler,
+        ast.Match,
+        ast.AsyncFor,
+        ast.AsyncWith,
     }
 
     # AST node types that represent function/class definitions
-    DEFINITION_NODES = {
-        ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef
-    }
+    DEFINITION_NODES = {ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef}
 
     # AST node types for operators and operations
-    OPERATOR_NODES = {
-        ast.BinOp, ast.UnaryOp, ast.BoolOp, ast.Compare,
-        ast.AugAssign, ast.AnnAssign
-    }
+    OPERATOR_NODES = {ast.BinOp, ast.UnaryOp, ast.BoolOp, ast.Compare, ast.AugAssign, ast.AnnAssign}
 
     def __init__(self, threshold: float = 0.8):
         """
@@ -107,7 +109,7 @@ class ASTDetector:
             raise FileNotFoundError(f"File not found: {file_path}")
 
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 return f.read()
         except Exception as e:
             raise IOError(f"Error reading file {file_path}: {str(e)}")
@@ -166,6 +168,7 @@ class ASTDetector:
             Original: def calc(x, y): return x + y
             Normalized: def func(var, var): return var + var
         """
+
         class NormalizingTransformer(ast.NodeTransformer):
             """
             AST transformer that removes identifier information.
@@ -177,19 +180,19 @@ class ASTDetector:
             def visit_Name(self, node):
                 """Replace variable names with generic 'var'."""
                 # Preserve the node type but replace the identifier
-                node.id = 'var'
+                node.id = "var"
                 return node
 
             def visit_arg(self, node):
                 """Replace function argument names with generic 'var'."""
-                node.arg = 'var'
+                node.arg = "var"
                 # Remove type annotations for normalization
                 node.annotation = None
                 return node
 
             def visit_FunctionDef(self, node):
                 """Replace function names but keep structure."""
-                node.name = 'func'
+                node.name = "func"
                 # Remove decorators for normalization
                 node.decorator_list = []
                 # Remove return type annotation
@@ -200,7 +203,7 @@ class ASTDetector:
 
             def visit_AsyncFunctionDef(self, node):
                 """Replace async function names but keep structure."""
-                node.name = 'func'
+                node.name = "func"
                 node.decorator_list = []
                 node.returns = None
                 self.generic_visit(node)
@@ -208,7 +211,7 @@ class ASTDetector:
 
             def visit_ClassDef(self, node):
                 """Replace class names but keep structure."""
-                node.name = 'Class'
+                node.name = "Class"
                 node.decorator_list = []
                 # Keep inheritance structure but normalize base names
                 self.generic_visit(node)
@@ -218,7 +221,7 @@ class ASTDetector:
                 """Replace constant values with generic placeholders."""
                 # Preserve the type of constant but normalize the value
                 if isinstance(node.value, str):
-                    node.value = ''
+                    node.value = ""
                 elif isinstance(node.value, (int, float, complex)):
                     node.value = 0
                 elif isinstance(node.value, bool):
@@ -229,12 +232,13 @@ class ASTDetector:
 
             def visit_Attribute(self, node):
                 """Replace attribute names with generic 'attr'."""
-                node.attr = 'attr'
+                node.attr = "attr"
                 self.generic_visit(node)
                 return node
 
         # Create a deep copy and normalize it
         import copy
+
         normalized_tree = copy.deepcopy(tree)
         transformer = NormalizingTransformer()
         normalized_tree = transformer.visit(normalized_tree)
@@ -474,15 +478,14 @@ class ASTDetector:
         # Frequency similarity: 30%
         # Size consideration: 10% (penalizes mismatched sizes)
         combined_similarity = (
-            0.6 * structural_similarity +
-            0.3 * frequency_similarity +
-            0.1 * size_penalty
+            0.6 * structural_similarity + 0.3 * frequency_similarity + 0.1 * size_penalty
         )
 
         return combined_similarity
 
-    def _calculate_frequency_similarity(self, counts1: Dict[str, int],
-                                       counts2: Dict[str, int]) -> float:
+    def _calculate_frequency_similarity(
+        self, counts1: Dict[str, int], counts2: Dict[str, int]
+    ) -> float:
         """
         Calculate similarity based on node type frequencies.
 
@@ -515,12 +518,12 @@ class ASTDetector:
             count2 = counts2.get(node_type, 0)
 
             dot_product += count1 * count2
-            magnitude1 += count1 ** 2
-            magnitude2 += count2 ** 2
+            magnitude1 += count1**2
+            magnitude2 += count2**2
 
         # Calculate cosine similarity
-        magnitude1 = magnitude1 ** 0.5
-        magnitude2 = magnitude2 ** 0.5
+        magnitude1 = magnitude1**0.5
+        magnitude2 = magnitude2**0.5
 
         if magnitude1 == 0.0 or magnitude2 == 0.0:
             return 0.0
@@ -576,13 +579,13 @@ class ASTDetector:
         if tree1 is None or tree2 is None:
             # If either file has syntax errors, return zero similarity
             return {
-                'similarity_score': 0.0,
-                'file1': str(file1_path),
-                'file2': str(file2_path),
-                'file1_nodes': 0,
-                'file2_nodes': 0,
-                'common_structures': 0,
-                'detector': 'ast'
+                "similarity_score": 0.0,
+                "file1": str(file1_path),
+                "file2": str(file2_path),
+                "file1_nodes": 0,
+                "file2_nodes": 0,
+                "common_structures": 0,
+                "detector": "ast",
             }
 
         # Normalize ASTs to remove identifier information
@@ -601,13 +604,13 @@ class ASTDetector:
 
         # Prepare detailed result
         result = {
-            'similarity_score': similarity_score,
-            'file1': str(file1_path),
-            'file2': str(file2_path),
-            'file1_nodes': len(sig1),
-            'file2_nodes': len(sig2),
-            'common_structures': common_structures,
-            'detector': 'ast'
+            "similarity_score": similarity_score,
+            "file1": str(file1_path),
+            "file2": str(file2_path),
+            "file1_nodes": len(sig1),
+            "file2_nodes": len(sig2),
+            "common_structures": common_structures,
+            "detector": "ast",
         }
 
         return result

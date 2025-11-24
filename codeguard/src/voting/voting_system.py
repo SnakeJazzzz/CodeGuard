@@ -49,21 +49,9 @@ class VotingSystem:
 
     # Default configuration
     DEFAULT_CONFIG = {
-        'token': {
-            'threshold': 0.70,
-            'weight': 1.0,
-            'confidence_weight': 0.3
-        },
-        'ast': {
-            'threshold': 0.80,
-            'weight': 2.0,
-            'confidence_weight': 0.4
-        },
-        'hash': {
-            'threshold': 0.60,
-            'weight': 1.5,
-            'confidence_weight': 0.3
-        }
+        "token": {"threshold": 0.70, "weight": 1.0, "confidence_weight": 0.3},
+        "ast": {"threshold": 0.80, "weight": 2.0, "confidence_weight": 0.4},
+        "hash": {"threshold": 0.60, "weight": 1.5, "confidence_weight": 0.3},
     }
 
     def __init__(self, config: Optional[Dict[str, Dict[str, float]]] = None):
@@ -94,14 +82,15 @@ class VotingSystem:
 
         # Calculate total possible weighted votes (exclude decision_threshold)
         self.total_possible_votes = sum(
-            detector['weight'] for detector in self.config.values()
-            if isinstance(detector, dict) and 'weight' in detector
+            detector["weight"]
+            for detector in self.config.values()
+            if isinstance(detector, dict) and "weight" in detector
         )
 
         # Decision threshold: use custom if provided, otherwise 50% of total weighted votes
-        if 'decision_threshold' in self.config:
+        if "decision_threshold" in self.config:
             # Config contains a percentage (0.0-1.0)
-            decision_threshold_pct = self.config['decision_threshold']
+            decision_threshold_pct = self.config["decision_threshold"]
             self.decision_threshold = self.total_possible_votes * decision_threshold_pct
         else:
             # Default to 50% of total weighted votes
@@ -120,11 +109,11 @@ class VotingSystem:
         Raises:
             ValueError: If any configuration parameter is invalid.
         """
-        required_detectors = {'token', 'ast', 'hash'}
+        required_detectors = {"token", "ast", "hash"}
         config_keys = set(self.config.keys())
 
         # Remove optional decision_threshold key for validation
-        detector_keys = config_keys - {'decision_threshold'}
+        detector_keys = config_keys - {"decision_threshold"}
 
         if detector_keys != required_detectors:
             raise ValueError(
@@ -133,8 +122,8 @@ class VotingSystem:
             )
 
         # Validate decision_threshold if present
-        if 'decision_threshold' in self.config:
-            decision_threshold = self.config['decision_threshold']
+        if "decision_threshold" in self.config:
+            decision_threshold = self.config["decision_threshold"]
             if not (0.0 <= decision_threshold <= 1.0):
                 raise ValueError(
                     f"decision_threshold must be in [0.0, 1.0], got {decision_threshold}"
@@ -144,31 +133,28 @@ class VotingSystem:
 
         for detector_name, params in self.config.items():
             # Skip non-detector keys
-            if detector_name == 'decision_threshold':
+            if detector_name == "decision_threshold":
                 continue
             # Validate threshold
-            if 'threshold' not in params:
+            if "threshold" not in params:
                 raise ValueError(f"Missing 'threshold' for {detector_name}")
-            threshold = params['threshold']
+            threshold = params["threshold"]
             if not (0.0 <= threshold <= 1.0):
                 raise ValueError(
-                    f"Threshold for {detector_name} must be in [0.0, 1.0], "
-                    f"got {threshold}"
+                    f"Threshold for {detector_name} must be in [0.0, 1.0], " f"got {threshold}"
                 )
 
             # Validate weight
-            if 'weight' not in params:
+            if "weight" not in params:
                 raise ValueError(f"Missing 'weight' for {detector_name}")
-            weight = params['weight']
+            weight = params["weight"]
             if weight <= 0:
-                raise ValueError(
-                    f"Weight for {detector_name} must be positive, got {weight}"
-                )
+                raise ValueError(f"Weight for {detector_name} must be positive, got {weight}")
 
             # Validate confidence weight
-            if 'confidence_weight' not in params:
+            if "confidence_weight" not in params:
                 raise ValueError(f"Missing 'confidence_weight' for {detector_name}")
-            conf_weight = params['confidence_weight']
+            conf_weight = params["confidence_weight"]
             if not (0.0 <= conf_weight <= 1.0):
                 raise ValueError(
                     f"Confidence weight for {detector_name} must be in [0.0, 1.0], "
@@ -178,9 +164,7 @@ class VotingSystem:
 
         # Validate confidence weights sum to 1.0 (with small epsilon tolerance)
         if not math.isclose(confidence_sum, 1.0, abs_tol=1e-6):
-            raise ValueError(
-                f"Confidence weights must sum to 1.0, got {confidence_sum}"
-            )
+            raise ValueError(f"Confidence weights must sum to 1.0, got {confidence_sum}")
 
     def _validate_similarity_score(self, score: float, detector_name: str) -> None:
         """
@@ -204,16 +188,10 @@ class VotingSystem:
 
         if not (0.0 <= score <= 1.0):
             raise ValueError(
-                f"{detector_name} similarity score must be in [0.0, 1.0], "
-                f"got {score}"
+                f"{detector_name} similarity score must be in [0.0, 1.0], " f"got {score}"
             )
 
-    def vote(
-        self,
-        token_sim: float,
-        ast_sim: float,
-        hash_sim: float
-    ) -> Dict[str, Any]:
+    def vote(self, token_sim: float, ast_sim: float, hash_sim: float) -> Dict[str, Any]:
         """
         Aggregate detector results using weighted voting to determine plagiarism.
 
@@ -250,24 +228,20 @@ class VotingSystem:
             4.5
         """
         # Validate all inputs
-        self._validate_similarity_score(token_sim, 'Token')
-        self._validate_similarity_score(ast_sim, 'AST')
-        self._validate_similarity_score(hash_sim, 'Hash')
+        self._validate_similarity_score(token_sim, "Token")
+        self._validate_similarity_score(ast_sim, "AST")
+        self._validate_similarity_score(hash_sim, "Hash")
 
         # Map scores to detector names
-        scores = {
-            'token': token_sim,
-            'ast': ast_sim,
-            'hash': hash_sim
-        }
+        scores = {"token": token_sim, "ast": ast_sim, "hash": hash_sim}
 
         # Determine individual detector votes
         votes = {}
         weighted_votes = 0.0
 
         for detector_name, score in scores.items():
-            threshold = self.config[detector_name]['threshold']
-            weight = self.config[detector_name]['weight']
+            threshold = self.config[detector_name]["threshold"]
+            weight = self.config[detector_name]["weight"]
 
             # Cast vote: True if score meets or exceeds threshold
             vote_result = score >= threshold
@@ -287,7 +261,7 @@ class VotingSystem:
 
         # Calculate confidence score (weighted average of similarity scores)
         confidence_score = sum(
-            scores[detector_name] * self.config[detector_name]['confidence_weight']
+            scores[detector_name] * self.config[detector_name]["confidence_weight"]
             for detector_name in scores.keys()
         )
 
@@ -302,15 +276,11 @@ class VotingSystem:
 
         # Construct result dictionary
         result = {
-            'is_plagiarized': is_plagiarized,
-            'confidence_score': confidence_score,
-            'votes': votes,
-            'weighted_votes': weighted_votes,
-            'individual_scores': {
-                'token': token_sim,
-                'ast': ast_sim,
-                'hash': hash_sim
-            }
+            "is_plagiarized": is_plagiarized,
+            "confidence_score": confidence_score,
+            "votes": votes,
+            "weighted_votes": weighted_votes,
+            "individual_scores": {"token": token_sim, "ast": ast_sim, "hash": hash_sim},
         }
 
         return result
@@ -330,8 +300,7 @@ class VotingSystem:
         """
         if detector_name not in self.config:
             raise KeyError(
-                f"Unknown detector: {detector_name}. "
-                f"Available: {list(self.config.keys())}"
+                f"Unknown detector: {detector_name}. " f"Available: {list(self.config.keys())}"
             )
         return self.config[detector_name].copy()
 
@@ -343,16 +312,13 @@ class VotingSystem:
             Dictionary containing system configuration and thresholds.
         """
         return {
-            'detectors': list(self.config.keys()),
-            'detector_configs': {
-                name: self.get_detector_info(name)
-                for name in self.config.keys()
-            },
-            'total_possible_votes': self.total_possible_votes,
-            'decision_threshold': self.decision_threshold,
-            'decision_threshold_percentage': (
+            "detectors": list(self.config.keys()),
+            "detector_configs": {name: self.get_detector_info(name) for name in self.config.keys()},
+            "total_possible_votes": self.total_possible_votes,
+            "decision_threshold": self.decision_threshold,
+            "decision_threshold_percentage": (
                 self.decision_threshold / self.total_possible_votes * 100
-            )
+            ),
         }
 
     def __repr__(self) -> str:
@@ -362,7 +328,7 @@ class VotingSystem:
         Returns:
             String representation showing configuration details.
         """
-        detector_info = ', '.join(
+        detector_info = ", ".join(
             f"{name}(th={cfg['threshold']:.2f}, w={cfg['weight']})"
             for name, cfg in self.config.items()
         )
@@ -388,4 +354,4 @@ class VotingSystem:
             )
         lines.append(f"Total Possible Votes: {self.total_possible_votes}")
         lines.append(f"Decision Threshold: {self.decision_threshold} (50%)")
-        return '\n'.join(lines)
+        return "\n".join(lines)

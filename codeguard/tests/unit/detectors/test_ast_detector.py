@@ -22,9 +22,9 @@ class TestASTDetectorInitialization:
         """Test ASTDetector initializes with default threshold."""
         detector = ASTDetector()
         assert detector.threshold == 0.8
-        assert hasattr(detector, 'CONTROL_FLOW_NODES')
-        assert hasattr(detector, 'DEFINITION_NODES')
-        assert hasattr(detector, 'OPERATOR_NODES')
+        assert hasattr(detector, "CONTROL_FLOW_NODES")
+        assert hasattr(detector, "DEFINITION_NODES")
+        assert hasattr(detector, "OPERATOR_NODES")
 
     def test_custom_threshold(self):
         """Test ASTDetector initializes with custom threshold."""
@@ -150,7 +150,7 @@ class TestASTNormalization:
         # Verify function name was normalized
         func_def = normalized.body[0]
         assert isinstance(func_def, ast.FunctionDef)
-        assert func_def.name == 'func'
+        assert func_def.name == "func"
 
     def test_normalize_class_names(self):
         """Test that normalization replaces class names."""
@@ -162,7 +162,7 @@ class TestASTNormalization:
         assert normalized is not None
         class_def = normalized.body[0]
         assert isinstance(class_def, ast.ClassDef)
-        assert class_def.name == 'Class'
+        assert class_def.name == "Class"
 
     def test_normalize_constants(self):
         """Test that normalization replaces constant values."""
@@ -239,9 +239,9 @@ def factorial(n):
         signature = detector._extract_structure_signature(tree)
 
         assert len(signature) > 5
-        assert 'FunctionDef' in signature
-        assert 'If' in signature
-        assert 'Return' in signature
+        assert "FunctionDef" in signature
+        assert "If" in signature
+        assert "Return" in signature
 
     def test_signature_identical_structure(self):
         """Test that identical structures produce identical signatures."""
@@ -345,17 +345,17 @@ class TestAnalyzeMethod:
             file1 = Path(tmpdir) / "file1.py"
             file2 = Path(tmpdir) / "file2.py"
 
-            code = sample_code_pairs['identical']['code1']
+            code = sample_code_pairs["identical"]["code1"]
             file1.write_text(code)
             file2.write_text(code)
 
             result = detector.analyze(file1, file2)
 
-            assert abs(result['similarity_score'] - 1.0) < 0.0001
+            assert abs(result["similarity_score"] - 1.0) < 0.0001
             # AST detector doesn't return is_plagiarism - that's handled by voting system
-            assert result['detector'] == 'ast'
-            assert result['file1_nodes'] > 0
-            assert result['file2_nodes'] > 0
+            assert result["detector"] == "ast"
+            assert result["file1_nodes"] > 0
+            assert result["file2_nodes"] > 0
 
     def test_analyze_renamed_variables(self, sample_code_pairs):
         """Test analyzing code with renamed variables."""
@@ -365,13 +365,13 @@ class TestAnalyzeMethod:
             file1 = Path(tmpdir) / "file1.py"
             file2 = Path(tmpdir) / "file2.py"
 
-            file1.write_text(sample_code_pairs['renamed']['code1'])
-            file2.write_text(sample_code_pairs['renamed']['code2'])
+            file1.write_text(sample_code_pairs["renamed"]["code1"])
+            file2.write_text(sample_code_pairs["renamed"]["code2"])
 
             result = detector.analyze(file1, file2)
 
             # AST detector should detect high similarity despite renaming
-            assert result['similarity_score'] > 0.8
+            assert result["similarity_score"] > 0.8
 
     def test_analyze_different_files(self, sample_code_pairs):
         """Test analyzing completely different files."""
@@ -381,12 +381,12 @@ class TestAnalyzeMethod:
             file1 = Path(tmpdir) / "file1.py"
             file2 = Path(tmpdir) / "file2.py"
 
-            file1.write_text(sample_code_pairs['different']['code1'])
-            file2.write_text(sample_code_pairs['different']['code2'])
+            file1.write_text(sample_code_pairs["different"]["code1"])
+            file2.write_text(sample_code_pairs["different"]["code2"])
 
             result = detector.analyze(file1, file2)
 
-            assert result['similarity_score'] < 0.8
+            assert result["similarity_score"] < 0.8
 
     def test_analyze_nonexistent_file(self):
         """Test analyzing when file doesn't exist."""
@@ -414,12 +414,12 @@ class TestAnalyzeMethod:
             result = detector.analyze(file1, file2)
 
             # Check all required keys are present
-            assert 'similarity_score' in result
-            assert 'detector' in result
-            assert 'file1' in result
-            assert 'file2' in result
-            assert 'file1_nodes' in result
-            assert 'file2_nodes' in result
+            assert "similarity_score" in result
+            assert "detector" in result
+            assert "file1" in result
+            assert "file2" in result
+            assert "file1_nodes" in result
+            assert "file2_nodes" in result
 
 
 class TestEdgeCases:
@@ -438,7 +438,7 @@ class TestEdgeCases:
     def test_deeply_nested_code(self):
         """Test handling deeply nested structures."""
         detector = ASTDetector()
-        code = '''
+        code = """
 def outer():
     def middle():
         def inner():
@@ -447,7 +447,7 @@ def outer():
             return innermost()
         return inner()
     return middle()
-'''
+"""
         tree = detector._parse_ast(code)
         assert tree is not None
 
@@ -476,21 +476,21 @@ multiline string
     def test_async_functions(self):
         """Test handling async function definitions."""
         detector = ASTDetector()
-        code = '''
+        code = """
 async def fetch_data():
     return await get_data()
-'''
+"""
         tree = detector._parse_ast(code)
         assert tree is not None
 
     def test_decorators(self):
         """Test handling decorated functions."""
         detector = ASTDetector()
-        code = '''
+        code = """
 @decorator
 def my_function():
     pass
-'''
+"""
         tree = detector._parse_ast(code)
         assert tree is not None
 
@@ -511,27 +511,27 @@ def my_function():
     def test_exception_handling(self):
         """Test handling try-except blocks."""
         detector = ASTDetector()
-        code = '''
+        code = """
 try:
     risky_operation()
 except ValueError as e:
     handle_error(e)
 finally:
     cleanup()
-'''
+"""
         tree = detector._parse_ast(code)
         assert tree is not None
 
         signature = detector._extract_structure_signature(tree)
-        assert 'Try' in signature
+        assert "Try" in signature
 
     def test_context_managers(self):
         """Test handling with statements."""
         detector = ASTDetector()
-        code = '''
+        code = """
 with open('file.txt') as f:
     data = f.read()
-'''
+"""
         tree = detector._parse_ast(code)
         assert tree is not None
 
@@ -556,7 +556,7 @@ class TestThresholdBehavior:
             result = detector.analyze(file1, file2)
 
             # Test just checks similarity score
-            assert 'similarity_score' in result
+            assert "similarity_score" in result
 
     def test_above_threshold_is_plagiarism(self):
         """Test that similarity above threshold is flagged."""
@@ -582,7 +582,7 @@ def compute(a, b):
 
             result = detector.analyze(file1, file2)
 
-            assert result['similarity_score'] >= 0.5
+            assert result["similarity_score"] >= 0.5
 
 
 class TestStructuralPlagiarismDetection:
@@ -650,14 +650,17 @@ while left <= right:
         assert similarity < 0.9
 
 
-@pytest.mark.parametrize("threshold,expected_valid", [
-    (0.0, True),
-    (0.5, True),
-    (0.8, True),
-    (1.0, True),
-    (-0.1, False),
-    (1.1, False),
-])
+@pytest.mark.parametrize(
+    "threshold,expected_valid",
+    [
+        (0.0, True),
+        (0.5, True),
+        (0.8, True),
+        (1.0, True),
+        (-0.1, False),
+        (1.1, False),
+    ],
+)
 def test_threshold_validation(threshold, expected_valid):
     """Test threshold validation with various values."""
     if expected_valid:

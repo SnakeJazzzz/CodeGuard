@@ -10,7 +10,7 @@ agreement level.
 """
 
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 import statistics
 
 # Configure logging
@@ -18,10 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def calculate_confidence(
-    token: float,
-    ast: float,
-    hash: float,
-    weights: Optional[Dict[str, float]] = None
+    token: float, ast: float, hash: float, weights: Optional[Dict[str, float]] = None
 ) -> float:
     """
     Calculate overall confidence score from individual detector scores.
@@ -57,7 +54,7 @@ def calculate_confidence(
     """
     # Set default weights if not provided
     if weights is None:
-        weights = {'token': 0.3, 'ast': 0.4, 'hash': 0.3}
+        weights = {"token": 0.3, "ast": 0.4, "hash": 0.3}
 
     # Type validation
     try:
@@ -76,11 +73,10 @@ def calculate_confidence(
         raise ValueError(f"Hash score must be in range [0.0, 1.0], got {hash_val}")
 
     # Validate weights dictionary
-    required_keys = {'token', 'ast', 'hash'}
+    required_keys = {"token", "ast", "hash"}
     if set(weights.keys()) != required_keys:
         raise ValueError(
-            f"Weights must contain exactly keys {required_keys}, "
-            f"got {set(weights.keys())}"
+            f"Weights must contain exactly keys {required_keys}, " f"got {set(weights.keys())}"
         )
 
     # Validate weights are numeric and positive
@@ -97,15 +93,14 @@ def calculate_confidence(
     weight_sum = sum(weight_values.values())
     if abs(weight_sum - 1.0) > 1e-9:
         raise ValueError(
-            f"Weights must sum to 1.0, got {weight_sum}. "
-            f"Current weights: {weight_values}"
+            f"Weights must sum to 1.0, got {weight_sum}. " f"Current weights: {weight_values}"
         )
 
     # Calculate weighted confidence
     confidence = (
-        weight_values['token'] * token +
-        weight_values['ast'] * ast +
-        weight_values['hash'] * hash_val
+        weight_values["token"] * token
+        + weight_values["ast"] * ast
+        + weight_values["hash"] * hash_val
     )
 
     # Clamp to [0.0, 1.0] to handle floating-point errors
@@ -164,32 +159,26 @@ def get_confidence_level(confidence: float) -> str:
 
     # Range validation
     if not 0.0 <= confidence <= 1.0:
-        raise ValueError(
-            f"Confidence must be in range [0.0, 1.0], got {confidence}"
-        )
+        raise ValueError(f"Confidence must be in range [0.0, 1.0], got {confidence}")
 
     # Determine level based on thresholds
     if confidence >= 0.90:
-        level = 'Very High'
+        level = "Very High"
     elif confidence >= 0.75:
-        level = 'High'
+        level = "High"
     elif confidence >= 0.50:
-        level = 'Medium'
+        level = "Medium"
     elif confidence >= 0.25:
-        level = 'Low'
+        level = "Low"
     else:
-        level = 'Very Low'
+        level = "Very Low"
 
     logger.debug(f"Confidence {confidence:.4f} mapped to level '{level}'")
 
     return level
 
 
-def analyze_detector_agreement(
-    token: float,
-    ast: float,
-    hash: float
-) -> Dict[str, any]:
+def analyze_detector_agreement(token: float, ast: float, hash: float) -> Dict[str, any]:
     """
     Analyze agreement level between the three detectors.
 
@@ -261,13 +250,13 @@ def analyze_detector_agreement(
 
     # Determine agreement level
     if max_difference < 0.15:
-        agreement_level = 'Strong'
+        agreement_level = "Strong"
     elif max_difference < 0.30:
-        agreement_level = 'Moderate'
+        agreement_level = "Moderate"
     elif max_difference < 0.50:
-        agreement_level = 'Weak'
+        agreement_level = "Weak"
     else:
-        agreement_level = 'Poor'
+        agreement_level = "Poor"
 
     # Generate recommendations based on analysis
     recommendations = []
@@ -308,15 +297,11 @@ def analyze_detector_agreement(
 
     # Check for all low scores
     if max_score < 0.30:
-        recommendations.append(
-            "All detectors show low similarity - likely not plagiarism"
-        )
+        recommendations.append("All detectors show low similarity - likely not plagiarism")
 
     # Check for all high scores
     if min_score > 0.80:
-        recommendations.append(
-            "All detectors show high similarity - strong evidence of plagiarism"
-        )
+        recommendations.append("All detectors show high similarity - strong evidence of plagiarism")
 
     # Check for moderate agreement with all scores in middle range
     if 0.40 <= min_score and max_score <= 0.70 and max_difference < 0.20:
@@ -326,20 +311,18 @@ def analyze_detector_agreement(
 
     # If no specific recommendations, add general guidance
     if not recommendations:
-        if agreement_level in ['Strong', 'Moderate']:
-            recommendations.append(
-                "Detectors show good agreement - result is reliable"
-            )
+        if agreement_level in ["Strong", "Moderate"]:
+            recommendations.append("Detectors show good agreement - result is reliable")
         else:
             recommendations.append(
                 "Detector disagreement suggests edge case - manual review recommended"
             )
 
     result = {
-        'agreement_level': agreement_level,
-        'variance': variance,
-        'max_difference': max_difference,
-        'recommendations': recommendations
+        "agreement_level": agreement_level,
+        "variance": variance,
+        "max_difference": max_difference,
+        "recommendations": recommendations,
     }
 
     logger.debug(

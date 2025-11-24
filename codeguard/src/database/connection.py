@@ -63,6 +63,7 @@ CONNECTION_TIMEOUT: int = 30
 # Database Initialization
 # =============================================================================
 
+
 def init_db() -> None:
     """
     Initialize database schema from schema.sql file.
@@ -99,15 +100,11 @@ def init_db() -> None:
 
         # Read schema SQL
         logger.info(f"Reading schema from: {SCHEMA_PATH}")
-        schema_sql = SCHEMA_PATH.read_text(encoding='utf-8')
+        schema_sql = SCHEMA_PATH.read_text(encoding="utf-8")
 
         # Create database connection
         logger.info(f"Initializing database at: {DB_PATH}")
-        conn = sqlite3.connect(
-            str(DB_PATH),
-            timeout=CONNECTION_TIMEOUT,
-            check_same_thread=False
-        )
+        conn = sqlite3.connect(str(DB_PATH), timeout=CONNECTION_TIMEOUT, check_same_thread=False)
 
         try:
             # Enable foreign key constraints
@@ -118,9 +115,7 @@ def init_db() -> None:
             conn.commit()
 
             # Verify tables were created
-            cursor = conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-            )
+            cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
             tables = [row[0] for row in cursor.fetchall()]
             logger.info(f"Database initialized successfully. Tables created: {', '.join(tables)}")
 
@@ -140,9 +135,11 @@ def init_db() -> None:
         logger.error(f"Unexpected error during database initialization: {e}")
         raise
 
+
 # =============================================================================
 # Connection Management
 # =============================================================================
+
 
 def get_db_connection() -> sqlite3.Connection:
     """
@@ -183,7 +180,7 @@ def get_db_connection() -> sqlite3.Connection:
         conn = sqlite3.connect(
             str(DB_PATH),
             timeout=CONNECTION_TIMEOUT,
-            check_same_thread=False  # Allow connection to be used across threads
+            check_same_thread=False,  # Allow connection to be used across threads
         )
 
         # Enable foreign key constraints
@@ -202,6 +199,7 @@ def get_db_connection() -> sqlite3.Connection:
     except Exception as e:
         logger.error(f"Unexpected error getting database connection: {e}")
         raise
+
 
 @contextmanager
 def get_session() -> Generator[sqlite3.Connection, None, None]:
@@ -271,9 +269,11 @@ def get_session() -> Generator[sqlite3.Connection, None, None]:
             conn.close()
             logger.debug("Database session closed")
 
+
 # =============================================================================
 # Connection Cleanup
 # =============================================================================
+
 
 def close_connection(conn: Optional[sqlite3.Connection] = None) -> None:
     """
@@ -305,9 +305,11 @@ def close_connection(conn: Optional[sqlite3.Connection] = None) -> None:
     except Exception as e:
         logger.warning(f"Unexpected error closing database connection: {e}")
 
+
 # =============================================================================
 # Database Backup
 # =============================================================================
+
 
 def backup_database(backup_path: Optional[str] = None) -> str:
     """
@@ -388,9 +390,7 @@ def backup_database(backup_path: Optional[str] = None) -> str:
                 f"({original_size} bytes)"
             )
 
-        logger.info(
-            f"Backup created successfully: {backup_path_obj} ({backup_size} bytes)"
-        )
+        logger.info(f"Backup created successfully: {backup_path_obj} ({backup_size} bytes)")
 
         return str(backup_path_obj.resolve())
 
@@ -407,9 +407,11 @@ def backup_database(backup_path: Optional[str] = None) -> str:
         logger.error(f"Unexpected error creating backup: {e}")
         raise
 
+
 # =============================================================================
 # Database Information
 # =============================================================================
+
 
 def get_database_info() -> dict:
     """
@@ -430,36 +432,35 @@ def get_database_info() -> dict:
         >>> print(f"Tables: {', '.join(info['tables'])}")
     """
     info = {
-        'path': str(DB_PATH.resolve()),
-        'exists': DB_PATH.exists(),
-        'size_bytes': None,
-        'tables': [],
-        'indexes': []
+        "path": str(DB_PATH.resolve()),
+        "exists": DB_PATH.exists(),
+        "size_bytes": None,
+        "tables": [],
+        "indexes": [],
     }
 
     if DB_PATH.exists():
-        info['size_bytes'] = DB_PATH.stat().st_size
+        info["size_bytes"] = DB_PATH.stat().st_size
 
         try:
             with get_session() as conn:
                 # Get table names
                 cursor = conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table' "
-                    "ORDER BY name"
+                    "SELECT name FROM sqlite_master WHERE type='table' " "ORDER BY name"
                 )
-                info['tables'] = [row['name'] for row in cursor.fetchall()]
+                info["tables"] = [row["name"] for row in cursor.fetchall()]
 
                 # Get index names
                 cursor = conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type='index' "
-                    "ORDER BY name"
+                    "SELECT name FROM sqlite_master WHERE type='index' " "ORDER BY name"
                 )
-                info['indexes'] = [row['name'] for row in cursor.fetchall()]
+                info["indexes"] = [row["name"] for row in cursor.fetchall()]
 
         except sqlite3.Error as e:
             logger.error(f"Failed to get database info: {e}")
 
     return info
+
 
 # =============================================================================
 # Module Initialization

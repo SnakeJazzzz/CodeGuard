@@ -64,16 +64,8 @@ import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 
-from .connection import get_session, get_db_connection
-from .models import (
-    AnalysisJob,
-    ComparisonResult,
-    Configuration,
-    row_to_analysis_job,
-    row_to_comparison_result,
-    row_to_configuration,
-    VALID_STATUSES
-)
+from .connection import get_session
+from .models import row_to_analysis_job, row_to_comparison_result, VALID_STATUSES
 
 # Configure module logger
 logger = logging.getLogger(__name__)
@@ -82,29 +74,35 @@ logger = logging.getLogger(__name__)
 # Custom Exceptions
 # =============================================================================
 
+
 class JobNotFoundError(ValueError):
     """Raised when a job ID is not found in the database."""
+
     pass
 
 
 class InvalidStatusError(ValueError):
     """Raised when an invalid status value is provided."""
+
     pass
 
 
 class InvalidResultDataError(ValueError):
     """Raised when comparison result data is invalid."""
+
     pass
 
 
 class DatabaseOperationError(Exception):
     """Raised when a database operation fails."""
+
     pass
 
 
 # =============================================================================
 # Job Management Functions
 # =============================================================================
+
 
 def create_analysis_job(job_id: str, file_count: int) -> Dict[str, Any]:
     """
@@ -153,10 +151,7 @@ def create_analysis_job(job_id: str, file_count: int) -> Dict[str, Any]:
     try:
         with get_session() as conn:
             # Check if job_id already exists
-            cursor = conn.execute(
-                "SELECT id FROM analysis_jobs WHERE id = ?",
-                (job_id,)
-            )
+            cursor = conn.execute("SELECT id FROM analysis_jobs WHERE id = ?", (job_id,))
             if cursor.fetchone() is not None:
                 error_msg = f"Job with id '{job_id}' already exists"
                 logger.error(error_msg)
@@ -168,14 +163,11 @@ def create_analysis_job(job_id: str, file_count: int) -> Dict[str, Any]:
                 INSERT INTO analysis_jobs (id, status, file_count, pair_count, results_path)
                 VALUES (?, ?, ?, ?, ?)
                 """,
-                (job_id, 'pending', file_count, pair_count, None)
+                (job_id, "pending", file_count, pair_count, None),
             )
 
             # Retrieve the inserted job
-            cursor = conn.execute(
-                "SELECT * FROM analysis_jobs WHERE id = ?",
-                (job_id,)
-            )
+            cursor = conn.execute("SELECT * FROM analysis_jobs WHERE id = ?", (job_id,))
             row = cursor.fetchone()
 
             if row is None:
@@ -183,8 +175,7 @@ def create_analysis_job(job_id: str, file_count: int) -> Dict[str, Any]:
 
             job = row_to_analysis_job(row)
             logger.info(
-                f"Successfully created job {job_id}: {file_count} files, "
-                f"{pair_count} pairs"
+                f"Successfully created job {job_id}: {file_count} files, " f"{pair_count} pairs"
             )
 
             return job.to_dict()
@@ -230,14 +221,12 @@ def update_job_status(job_id: str, status: str) -> None:
 
     # Handle status aliases
     from .models import STATUS_ALIASES
+
     normalized_status = STATUS_ALIASES.get(status, status)
 
     # Validate status
     if normalized_status not in VALID_STATUSES:
-        error_msg = (
-            f"Invalid status '{status}'. "
-            f"Must be one of: {', '.join(VALID_STATUSES)}"
-        )
+        error_msg = f"Invalid status '{status}'. " f"Must be one of: {', '.join(VALID_STATUSES)}"
         logger.error(error_msg)
         raise InvalidStatusError(error_msg)
 
@@ -251,8 +240,7 @@ def update_job_status(job_id: str, status: str) -> None:
 
             # Update status (use normalized status)
             cursor = conn.execute(
-                "UPDATE analysis_jobs SET status = ? WHERE id = ?",
-                (normalized_status, job_id)
+                "UPDATE analysis_jobs SET status = ? WHERE id = ?", (normalized_status, job_id)
             )
 
             if cursor.rowcount == 0:
@@ -304,8 +292,7 @@ def update_job_results_path(job_id: str, results_path: str) -> None:
 
             # Update results_path
             cursor = conn.execute(
-                "UPDATE analysis_jobs SET results_path = ? WHERE id = ?",
-                (results_path, job_id)
+                "UPDATE analysis_jobs SET results_path = ? WHERE id = ?", (results_path, job_id)
             )
 
             if cursor.rowcount == 0:
@@ -360,10 +347,7 @@ def get_job_summary(job_id: str) -> Dict[str, Any]:
     try:
         with get_session() as conn:
             # Get job details
-            cursor = conn.execute(
-                "SELECT * FROM analysis_jobs WHERE id = ?",
-                (job_id,)
-            )
+            cursor = conn.execute("SELECT * FROM analysis_jobs WHERE id = ?", (job_id,))
             job_row = cursor.fetchone()
 
             if job_row is None:
@@ -383,13 +367,13 @@ def get_job_summary(job_id: str) -> Dict[str, Any]:
                 FROM comparison_results
                 WHERE job_id = ?
                 """,
-                (job_id,)
+                (job_id,),
             )
             stats_row = cursor.fetchone()
 
-            total_comparisons = stats_row['total_comparisons'] or 0
-            plagiarized_count = stats_row['plagiarized_count'] or 0
-            average_confidence = stats_row['average_confidence'] or 0.0
+            total_comparisons = stats_row["total_comparisons"] or 0
+            plagiarized_count = stats_row["plagiarized_count"] or 0
+            average_confidence = stats_row["average_confidence"] or 0.0
             clean_count = total_comparisons - plagiarized_count
 
             # Calculate completion percentage
@@ -400,18 +384,18 @@ def get_job_summary(job_id: str) -> Dict[str, Any]:
 
             summary = {
                 # Job details
-                'id': job.id,
-                'created_at': job.created_at.isoformat() if job.created_at else None,
-                'status': job.status,
-                'file_count': job.file_count,
-                'pair_count': job.pair_count,
-                'results_path': job.results_path,
+                "id": job.id,
+                "created_at": job.created_at.isoformat() if job.created_at else None,
+                "status": job.status,
+                "file_count": job.file_count,
+                "pair_count": job.pair_count,
+                "results_path": job.results_path,
                 # Statistics
-                'total_comparisons': total_comparisons,
-                'plagiarized_count': plagiarized_count,
-                'clean_count': clean_count,
-                'average_confidence': round(average_confidence, 4),
-                'completion_percentage': round(completion_percentage, 2)
+                "total_comparisons": total_comparisons,
+                "plagiarized_count": plagiarized_count,
+                "clean_count": clean_count,
+                "average_confidence": round(average_confidence, 4),
+                "completion_percentage": round(completion_percentage, 2),
             }
 
             logger.debug(
@@ -470,7 +454,7 @@ def get_recent_jobs(limit: int = 10) -> List[Dict[str, Any]]:
                 ORDER BY created_at DESC
                 LIMIT ?
                 """,
-                (limit,)
+                (limit,),
             )
 
             jobs = []
@@ -533,10 +517,7 @@ def cleanup_old_jobs(days: int = 30) -> int:
             cutoff_str = cutoff_date.isoformat()
 
             # Delete old jobs (cascade deletes comparison_results)
-            cursor = conn.execute(
-                "DELETE FROM analysis_jobs WHERE created_at < ?",
-                (cutoff_str,)
-            )
+            cursor = conn.execute("DELETE FROM analysis_jobs WHERE created_at < ?", (cutoff_str,))
 
             deleted_count = cursor.rowcount
             logger.info(
@@ -579,18 +560,12 @@ def job_exists(job_id: str, conn: Optional[sqlite3.Connection] = None) -> bool:
     try:
         if conn is not None:
             # Use provided connection
-            cursor = conn.execute(
-                "SELECT 1 FROM analysis_jobs WHERE id = ?",
-                (job_id,)
-            )
+            cursor = conn.execute("SELECT 1 FROM analysis_jobs WHERE id = ?", (job_id,))
             exists = cursor.fetchone() is not None
         else:
             # Create new connection
             with get_session() as conn:
-                cursor = conn.execute(
-                    "SELECT 1 FROM analysis_jobs WHERE id = ?",
-                    (job_id,)
-                )
+                cursor = conn.execute("SELECT 1 FROM analysis_jobs WHERE id = ?", (job_id,))
                 exists = cursor.fetchone() is not None
 
         logger.debug(f"Job {job_id} exists: {exists}")
@@ -607,6 +582,7 @@ def job_exists(job_id: str, conn: Optional[sqlite3.Connection] = None) -> bool:
 # =============================================================================
 # Comparison Results Functions
 # =============================================================================
+
 
 def save_comparison_result(job_id: str, result: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -672,22 +648,19 @@ def save_comparison_result(job_id: str, result: Dict[str, Any]) -> Dict[str, Any
                 """,
                 (
                     job_id,
-                    result['file1_name'],
-                    result['file2_name'],
-                    result['token_similarity'],
-                    result['ast_similarity'],
-                    result['hash_similarity'],
-                    1 if result['is_plagiarized'] else 0,
-                    result['confidence_score']
-                )
+                    result["file1_name"],
+                    result["file2_name"],
+                    result["token_similarity"],
+                    result["ast_similarity"],
+                    result["hash_similarity"],
+                    1 if result["is_plagiarized"] else 0,
+                    result["confidence_score"],
+                ),
             )
 
             # Get the inserted result with its ID
             result_id = cursor.lastrowid
-            cursor = conn.execute(
-                "SELECT * FROM comparison_results WHERE id = ?",
-                (result_id,)
-            )
+            cursor = conn.execute("SELECT * FROM comparison_results WHERE id = ?", (result_id,))
             row = cursor.fetchone()
 
             if row is None:
@@ -777,19 +750,17 @@ def save_batch_results(job_id: str, results: List[Dict[str, Any]]) -> None:
                     """,
                     (
                         job_id,
-                        result['file1_name'],
-                        result['file2_name'],
-                        result['token_similarity'],
-                        result['ast_similarity'],
-                        result['hash_similarity'],
-                        1 if result['is_plagiarized'] else 0,
-                        result['confidence_score']
-                    )
+                        result["file1_name"],
+                        result["file2_name"],
+                        result["token_similarity"],
+                        result["ast_similarity"],
+                        result["hash_similarity"],
+                        1 if result["is_plagiarized"] else 0,
+                        result["confidence_score"],
+                    ),
                 )
 
-            logger.info(
-                f"Successfully saved batch of {len(results)} results for job {job_id}"
-            )
+            logger.info(f"Successfully saved batch of {len(results)} results for job {job_id}")
 
     except (JobNotFoundError, InvalidResultDataError):
         raise
@@ -843,7 +814,7 @@ def get_job_results(job_id: str) -> List[Dict[str, Any]]:
                 WHERE job_id = ?
                 ORDER BY created_at
                 """,
-                (job_id,)
+                (job_id,),
             )
 
             results = []
@@ -902,11 +873,11 @@ def get_plagiarism_count(job_id: str) -> int:
                 FROM comparison_results
                 WHERE job_id = ? AND is_plagiarized = 1
                 """,
-                (job_id,)
+                (job_id,),
             )
 
             row = cursor.fetchone()
-            count = row['count'] if row else 0
+            count = row["count"] if row else 0
 
             logger.debug(f"Job {job_id} has {count} plagiarized pairs")
             return count
@@ -926,6 +897,7 @@ def get_plagiarism_count(job_id: str) -> int:
 # =============================================================================
 # Configuration Functions
 # =============================================================================
+
 
 def get_configuration(key: str) -> Optional[str]:
     """
@@ -950,13 +922,10 @@ def get_configuration(key: str) -> Optional[str]:
 
     try:
         with get_session() as conn:
-            cursor = conn.execute(
-                "SELECT value FROM configuration WHERE key = ?",
-                (key,)
-            )
+            cursor = conn.execute("SELECT value FROM configuration WHERE key = ?", (key,))
 
             row = cursor.fetchone()
-            value = row['value'] if row else None
+            value = row["value"] if row else None
 
             logger.debug(f"Configuration {key}: {value}")
             return value
@@ -1004,7 +973,7 @@ def set_configuration(key: str, value: str) -> None:
                 INSERT OR REPLACE INTO configuration (key, value, updated_at)
                 VALUES (?, ?, CURRENT_TIMESTAMP)
                 """,
-                (key, value)
+                (key, value),
             )
 
             logger.info(f"Successfully set configuration {key}")
@@ -1045,7 +1014,7 @@ def get_all_configuration() -> Dict[str, str]:
 
             config = {}
             for row in cursor.fetchall():
-                config[row['key']] = row['value']
+                config[row["key"]] = row["value"]
 
             logger.debug(f"Retrieved {len(config)} configuration values")
             return config
@@ -1064,6 +1033,7 @@ def get_all_configuration() -> Dict[str, str]:
 # Helper Functions
 # =============================================================================
 
+
 def _validate_result_data(result: Dict[str, Any]) -> None:
     """
     Validate comparison result data.
@@ -1079,21 +1049,19 @@ def _validate_result_data(result: Dict[str, Any]) -> None:
     """
     # Required fields
     required_fields = {
-        'file1_name': str,
-        'file2_name': str,
-        'token_similarity': (int, float),
-        'ast_similarity': (int, float),
-        'hash_similarity': (int, float),
-        'is_plagiarized': bool,
-        'confidence_score': (int, float)
+        "file1_name": str,
+        "file2_name": str,
+        "token_similarity": (int, float),
+        "ast_similarity": (int, float),
+        "hash_similarity": (int, float),
+        "is_plagiarized": bool,
+        "confidence_score": (int, float),
     }
 
     # Check for missing fields
     missing = [field for field in required_fields if field not in result]
     if missing:
-        raise InvalidResultDataError(
-            f"Missing required fields: {', '.join(missing)}"
-        )
+        raise InvalidResultDataError(f"Missing required fields: {', '.join(missing)}")
 
     # Check field types
     for field, expected_type in required_fields.items():
@@ -1104,7 +1072,12 @@ def _validate_result_data(result: Dict[str, Any]) -> None:
             )
 
     # Validate similarity scores are in range [0.0, 1.0]
-    similarity_fields = ['token_similarity', 'ast_similarity', 'hash_similarity', 'confidence_score']
+    similarity_fields = [
+        "token_similarity",
+        "ast_similarity",
+        "hash_similarity",
+        "confidence_score",
+    ]
     for field in similarity_fields:
         value = result[field]
         if not 0.0 <= value <= 1.0:
@@ -1113,9 +1086,9 @@ def _validate_result_data(result: Dict[str, Any]) -> None:
             )
 
     # Validate file names are not empty
-    if not result['file1_name'].strip():
+    if not result["file1_name"].strip():
         raise InvalidResultDataError("file1_name cannot be empty")
-    if not result['file2_name'].strip():
+    if not result["file2_name"].strip():
         raise InvalidResultDataError("file2_name cannot be empty")
 
 

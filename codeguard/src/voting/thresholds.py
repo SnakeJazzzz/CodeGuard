@@ -50,27 +50,15 @@ class ThresholdManager:
     """
 
     # Default configuration values
-    DEFAULT_THRESHOLDS = {
-        'token': 0.70,
-        'ast': 0.80,
-        'hash': 0.60
-    }
+    DEFAULT_THRESHOLDS = {"token": 0.70, "ast": 0.80, "hash": 0.60}
 
-    DEFAULT_WEIGHTS = {
-        'token': 1.0,
-        'ast': 2.0,
-        'hash': 1.5
-    }
+    DEFAULT_WEIGHTS = {"token": 1.0, "ast": 2.0, "hash": 1.5}
 
-    DEFAULT_CONFIDENCE_WEIGHTS = {
-        'token': 0.3,
-        'ast': 0.4,
-        'hash': 0.3
-    }
+    DEFAULT_CONFIDENCE_WEIGHTS = {"token": 0.3, "ast": 0.4, "hash": 0.3}
 
     DEFAULT_DECISION_THRESHOLD = 0.50
 
-    VALID_DETECTORS = {'token', 'ast', 'hash'}
+    VALID_DETECTORS = {"token", "ast", "hash"}
 
     def __init__(self, config_path: Optional[str] = None):
         """
@@ -128,8 +116,7 @@ class ThresholdManager:
         detector = detector.lower()
         if detector not in self.VALID_DETECTORS:
             raise ValueError(
-                f"Invalid detector name '{detector}'. "
-                f"Must be one of {self.VALID_DETECTORS}"
+                f"Invalid detector name '{detector}'. " f"Must be one of {self.VALID_DETECTORS}"
             )
 
         return self._thresholds[detector]
@@ -157,8 +144,7 @@ class ThresholdManager:
         detector = detector.lower()
         if detector not in self.VALID_DETECTORS:
             raise ValueError(
-                f"Invalid detector name '{detector}'. "
-                f"Must be one of {self.VALID_DETECTORS}"
+                f"Invalid detector name '{detector}'. " f"Must be one of {self.VALID_DETECTORS}"
             )
 
         # Type validation
@@ -169,16 +155,12 @@ class ThresholdManager:
 
         # Range validation
         if not 0.0 <= value <= 1.0:
-            raise ValueError(
-                f"Threshold must be in range [0.0, 1.0], got {value}"
-            )
+            raise ValueError(f"Threshold must be in range [0.0, 1.0], got {value}")
 
         old_value = self._thresholds[detector]
         self._thresholds[detector] = value
 
-        logger.info(
-            f"Updated {detector} threshold: {old_value:.4f} -> {value:.4f}"
-        )
+        logger.info(f"Updated {detector} threshold: {old_value:.4f} -> {value:.4f}")
 
     def get_weight(self, detector: str) -> float:
         """
@@ -203,8 +185,7 @@ class ThresholdManager:
         detector = detector.lower()
         if detector not in self.VALID_DETECTORS:
             raise ValueError(
-                f"Invalid detector name '{detector}'. "
-                f"Must be one of {self.VALID_DETECTORS}"
+                f"Invalid detector name '{detector}'. " f"Must be one of {self.VALID_DETECTORS}"
             )
 
         return self._weights[detector]
@@ -232,8 +213,7 @@ class ThresholdManager:
         detector = detector.lower()
         if detector not in self.VALID_DETECTORS:
             raise ValueError(
-                f"Invalid detector name '{detector}'. "
-                f"Must be one of {self.VALID_DETECTORS}"
+                f"Invalid detector name '{detector}'. " f"Must be one of {self.VALID_DETECTORS}"
             )
 
         # Type validation
@@ -244,16 +224,12 @@ class ThresholdManager:
 
         # Positive validation
         if value <= 0.0:
-            raise ValueError(
-                f"Weight must be positive (> 0.0), got {value}"
-            )
+            raise ValueError(f"Weight must be positive (> 0.0), got {value}")
 
         old_value = self._weights[detector]
         self._weights[detector] = value
 
-        logger.info(
-            f"Updated {detector} weight: {old_value:.4f} -> {value:.4f}"
-        )
+        logger.info(f"Updated {detector} weight: {old_value:.4f} -> {value:.4f}")
 
     def get_confidence_weight(self, detector: str) -> float:
         """
@@ -276,8 +252,7 @@ class ThresholdManager:
         detector = detector.lower()
         if detector not in self.VALID_DETECTORS:
             raise ValueError(
-                f"Invalid detector name '{detector}'. "
-                f"Must be one of {self.VALID_DETECTORS}"
+                f"Invalid detector name '{detector}'. " f"Must be one of {self.VALID_DETECTORS}"
             )
 
         return self._confidence_weights[detector]
@@ -319,16 +294,12 @@ class ThresholdManager:
             raise TypeError(f"Decision threshold must be numeric: {e}")
 
         if not 0.0 <= value <= 1.0:
-            raise ValueError(
-                f"Decision threshold must be in range [0.0, 1.0], got {value}"
-            )
+            raise ValueError(f"Decision threshold must be in range [0.0, 1.0], got {value}")
 
         old_value = self._decision_threshold
         self._decision_threshold = value
 
-        logger.info(
-            f"Updated decision threshold: {old_value:.4f} -> {value:.4f}"
-        )
+        logger.info(f"Updated decision threshold: {old_value:.4f} -> {value:.4f}")
 
     def validate_thresholds(self) -> bool:
         """
@@ -358,58 +329,45 @@ class ThresholdManager:
             if detector not in self._weights:
                 raise ValueError(f"Missing weight for detector '{detector}'")
             if detector not in self._confidence_weights:
-                raise ValueError(
-                    f"Missing confidence weight for detector '{detector}'"
-                )
+                raise ValueError(f"Missing confidence weight for detector '{detector}'")
 
         # Validate threshold ranges
         for detector, threshold in self._thresholds.items():
             if not isinstance(threshold, (int, float)):
                 raise ValueError(
-                    f"Threshold for '{detector}' must be numeric, "
-                    f"got {type(threshold)}"
+                    f"Threshold for '{detector}' must be numeric, " f"got {type(threshold)}"
                 )
             if not 0.0 <= threshold <= 1.0:
                 raise ValueError(
-                    f"Threshold for '{detector}' must be in [0.0, 1.0], "
-                    f"got {threshold}"
+                    f"Threshold for '{detector}' must be in [0.0, 1.0], " f"got {threshold}"
                 )
 
         # Validate weight positivity
         for detector, weight in self._weights.items():
             if not isinstance(weight, (int, float)):
-                raise ValueError(
-                    f"Weight for '{detector}' must be numeric, "
-                    f"got {type(weight)}"
-                )
+                raise ValueError(f"Weight for '{detector}' must be numeric, " f"got {type(weight)}")
             if weight <= 0.0:
-                raise ValueError(
-                    f"Weight for '{detector}' must be positive, got {weight}"
-                )
+                raise ValueError(f"Weight for '{detector}' must be positive, got {weight}")
 
         # Validate confidence weights
         for detector, weight in self._confidence_weights.items():
             if not isinstance(weight, (int, float)):
                 raise ValueError(
-                    f"Confidence weight for '{detector}' must be numeric, "
-                    f"got {type(weight)}"
+                    f"Confidence weight for '{detector}' must be numeric, " f"got {type(weight)}"
                 )
             if not 0.0 <= weight <= 1.0:
                 raise ValueError(
-                    f"Confidence weight for '{detector}' must be in [0.0, 1.0], "
-                    f"got {weight}"
+                    f"Confidence weight for '{detector}' must be in [0.0, 1.0], " f"got {weight}"
                 )
 
         # Validate decision threshold
         if not isinstance(self._decision_threshold, (int, float)):
             raise ValueError(
-                f"Decision threshold must be numeric, "
-                f"got {type(self._decision_threshold)}"
+                f"Decision threshold must be numeric, " f"got {type(self._decision_threshold)}"
             )
         if not 0.0 <= self._decision_threshold <= 1.0:
             raise ValueError(
-                f"Decision threshold must be in [0.0, 1.0], "
-                f"got {self._decision_threshold}"
+                f"Decision threshold must be in [0.0, 1.0], " f"got {self._decision_threshold}"
             )
 
         logger.debug("All thresholds and weights validated successfully")
@@ -447,45 +405,37 @@ class ThresholdManager:
         logger.info(f"Loading configuration from {config_path}")
 
         try:
-            with open(config_path, 'r', encoding='utf-8') as f:
+            with open(config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
         except json.JSONDecodeError as e:
-            raise json.JSONDecodeError(
-                f"Invalid JSON in configuration file: {e.msg}",
-                e.doc,
-                e.pos
-            )
+            raise json.JSONDecodeError(f"Invalid JSON in configuration file: {e.msg}", e.doc, e.pos)
 
         # Load thresholds
-        if 'thresholds' in config:
-            if not isinstance(config['thresholds'], dict):
+        if "thresholds" in config:
+            if not isinstance(config["thresholds"], dict):
                 raise ValueError("'thresholds' must be a dictionary")
-            for detector, value in config['thresholds'].items():
+            for detector, value in config["thresholds"].items():
                 if detector in self.VALID_DETECTORS:
                     self.set_threshold(detector, value)
                 else:
-                    logger.warning(
-                        f"Ignoring unknown detector '{detector}' in thresholds"
-                    )
+                    logger.warning(f"Ignoring unknown detector '{detector}' in thresholds")
 
         # Load weights
-        if 'weights' in config:
-            if not isinstance(config['weights'], dict):
+        if "weights" in config:
+            if not isinstance(config["weights"], dict):
                 raise ValueError("'weights' must be a dictionary")
-            for detector, value in config['weights'].items():
+            for detector, value in config["weights"].items():
                 if detector in self.VALID_DETECTORS:
                     self.set_weight(detector, value)
                 else:
-                    logger.warning(
-                        f"Ignoring unknown detector '{detector}' in weights"
-                    )
+                    logger.warning(f"Ignoring unknown detector '{detector}' in weights")
 
         # Load confidence weights
-        if 'confidence_weights' in config:
-            if not isinstance(config['confidence_weights'], dict):
+        if "confidence_weights" in config:
+            if not isinstance(config["confidence_weights"], dict):
                 raise ValueError("'confidence_weights' must be a dictionary")
             self._confidence_weights = {}
-            for detector, value in config['confidence_weights'].items():
+            for detector, value in config["confidence_weights"].items():
                 if detector in self.VALID_DETECTORS:
                     try:
                         value = float(value)
@@ -496,18 +446,15 @@ class ThresholdManager:
                             )
                         self._confidence_weights[detector] = value
                     except (TypeError, ValueError) as e:
-                        raise ValueError(
-                            f"Invalid confidence weight for '{detector}': {e}"
-                        )
+                        raise ValueError(f"Invalid confidence weight for '{detector}': {e}")
                 else:
                     logger.warning(
-                        f"Ignoring unknown detector '{detector}' "
-                        f"in confidence_weights"
+                        f"Ignoring unknown detector '{detector}' " f"in confidence_weights"
                     )
 
         # Load decision threshold
-        if 'decision_threshold' in config:
-            self.set_decision_threshold(config['decision_threshold'])
+        if "decision_threshold" in config:
+            self.set_decision_threshold(config["decision_threshold"])
 
         # Validate loaded configuration
         self.validate_thresholds()
@@ -542,7 +489,7 @@ class ThresholdManager:
         logger.info(f"Saving configuration to {config_path}")
 
         try:
-            with open(config_path, 'w', encoding='utf-8') as f:
+            with open(config_path, "w", encoding="utf-8") as f:
                 json.dump(config, f, indent=2, sort_keys=True)
         except IOError as e:
             raise IOError(f"Failed to write configuration file: {e}")
@@ -566,10 +513,10 @@ class ThresholdManager:
             True
         """
         return {
-            'thresholds': self._thresholds.copy(),
-            'weights': self._weights.copy(),
-            'confidence_weights': self._confidence_weights.copy(),
-            'decision_threshold': self._decision_threshold
+            "thresholds": self._thresholds.copy(),
+            "weights": self._weights.copy(),
+            "confidence_weights": self._confidence_weights.copy(),
+            "decision_threshold": self._decision_threshold,
         }
 
     def reset_to_defaults(self) -> None:
