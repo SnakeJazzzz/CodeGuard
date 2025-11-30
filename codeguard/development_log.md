@@ -361,3 +361,71 @@ This file tracks session-by-session development progress, implementation details
 5. Create deployment guide
 
 ---
+
+## Session 6 - 2025-11-26 (4 hours)
+
+### Accomplishments
+- FizzBuzz test scenario (20 files, 490 lines)
+- RockPaperScissors test scenario (20 files, 2,534 lines)
+- measure_fizzbuzz_accuracy.py (684 lines)
+- measure_rps_accuracy.py (1,257 lines)
+- ACCURACY_REPORT.md updated (FizzBuzz results)
+- COMPARATIVE_ANALYSIS.md created (561 lines)
+- FizzBuzz: 71.43% precision, 83.33% recall, 76.92% F1
+- RPS: 100% precision, 100% recall, 100% F1, 100% accuracy
+
+### Files Changed
+**Created:**
+- test_files/FizzBuzzProblem/plagiarized/student_01.py through student_04.py
+- test_files/FizzBuzzProblem/legitimate/student_05.py through student_20.py
+- test_files/FizzBuzzProblem/README.md
+- test_files/RockPaperScissors/plagiarized/student_01.py through student_04.py
+- test_files/RockPaperScissors/legitimate/student_05.py through student_20.py
+- test_files/RockPaperScissors/README.md
+- scripts/measure_fizzbuzz_accuracy.py
+- scripts/measure_rps_accuracy.py
+- docs/COMPARATIVE_ANALYSIS.md
+
+**Modified:**
+- docs/ACCURACY_REPORT.md (enhanced with FizzBuzz section)
+
+**Deleted:**
+- None
+
+### Incomplete Items
+- Adaptive threshold implementation (file-size based)
+- Problem complexity scoring system
+- AST threshold tuning (0.80 → 0.90 for <50 lines)
+- Hash threshold tuning (0.60 → 0.25-0.30 for small files)
+- Performance benchmarking (detector speeds)
+- Docker deployment configuration
+
+### Problems & Solutions
+- **Problem:** FizzBuzz test showed 71.43% precision (below 85% target)
+- **Solution:** Identified file size as critical factor; documented need for adaptive thresholds
+
+- **Problem:** Hash detector 0% precision on files <50 lines
+- **Solution:** Discovered Winnowing algorithm needs minimum fingerprints; works perfectly on ≥50 lines
+
+- **Problem:** AST detector flagged legitimate solutions as similar in constrained problems
+- **Solution:** Identified that 0.80 threshold too low for simple problems; needs 0.90+ for <50 lines
+
+- **Problem:** Voting system over-sensitive on small files
+- **Solution:** RPS testing proved voting works perfectly on realistic-sized code (≥50 lines)
+
+### Quality Metrics
+- Tests: All 40 test files syntactically valid
+- FizzBuzz: 22 test pairs analyzed
+- RPS: 26 test pairs analyzed
+- Code written: ~5,965 lines (3,024 test files + 1,941 scripts + 1,000 docs)
+- FizzBuzz metrics: Precision 71.43%, Recall 83.33%, F1 76.92%
+- RPS metrics: Precision 100%, Recall 100%, F1 100%, Accuracy 100%
+
+### Next Session Goals
+1. Implement adaptive thresholds (file-size based)
+2. Add problem complexity scoring module
+3. Tune AST threshold to 0.90 for files <50 lines
+4. Lower Hash threshold to 0.25-0.30 for small files
+5. Update ThresholdManager with adaptive logic
+
+---

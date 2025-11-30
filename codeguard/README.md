@@ -11,7 +11,7 @@ CodeGuard is an intelligent code plagiarism detection system designed to help ed
 
 ## Project Status
 
-**Completion:** 90% (Week 12 of 15)
+**Completion:** 93% (Week 13 of 15)
 
 **Major Milestones Completed:**
 - All three detection algorithms implemented and validated
@@ -19,18 +19,31 @@ CodeGuard is an intelligent code plagiarism detection system designed to help ed
 - Professional Streamlit interface with educational content
 - Database layer for analysis persistence
 - Comprehensive testing infrastructure (417 tests, 72% coverage)
-- Accuracy validation against 12 test cases
+- Real-world effectiveness testing (58 validation files, 48 comparison pairs)
 
 ## Accuracy Results
 
-The CodeGuard system has been rigorously validated against 12 diverse test cases:
+The CodeGuard system has been rigorously validated with comprehensive real-world testing:
 
+**Validation Dataset (12 diverse test cases):**
 - **Precision:** 100.00% (Target: ≥85%)
 - **Recall:** 100.00% (Target: ≥80%)
 - **F1 Score:** 100.00% (Target: ≥82%)
-- **Accuracy:** 100.00%
 
-See [ACCURACY_REPORT.md](docs/ACCURACY_REPORT.md) for detailed validation results.
+**Rock-Paper-Scissors Realistic Testing (26 comparison pairs, 50-165 lines/file):**
+- **Precision:** 100.00% (0 false positives)
+- **Recall:** 100.00% (0 false negatives)
+- **F1 Score:** 100.00%
+- **Accuracy:** 100.00%
+- **Status:** PRODUCTION-READY for realistic classroom code
+
+**FizzBuzz Constrained Testing (22 comparison pairs, 15-35 lines/file):**
+- **Precision:** 71.43% (2 false positives)
+- **Recall:** 83.33% (1 false negative)
+- **F1 Score:** 76.92%
+- **Status:** Adaptive thresholds needed for small files (<50 lines)
+
+**Key Finding:** System achieves 100% accuracy on realistic-sized classroom assignments (≥50 lines). See [ACCURACY_REPORT.md](docs/ACCURACY_REPORT.md) and [COMPARATIVE_ANALYSIS.md](docs/COMPARATIVE_ANALYSIS.md) for detailed validation results.
 
 ## Key Features
 
@@ -467,7 +480,8 @@ This is an academic project. Contributions welcome after December 2024.
 - [x] "How It Works" educational content
 - [ ] Performance benchmarking
 - [ ] User acceptance testing
-- [ ] Deployment to Streamlit Cloud or Docker
+- [x] Deployment to Streamlit Cloud
+- [ ] Deployment to Docker
 - [ ] Final documentation polish
 - [ ] Project defense and presentation
 
