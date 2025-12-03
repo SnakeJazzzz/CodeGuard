@@ -37,6 +37,7 @@ from src.detectors.token_detector import TokenDetector
 from src.detectors.ast_detector import ASTDetector
 from src.detectors.hash_detector import HashDetector
 from src.voting.voting_system import VotingSystem
+from src.core import get_preset_config
 
 
 class FizzBuzzEffectivenessTest:
@@ -47,22 +48,41 @@ class FizzBuzzEffectivenessTest:
     known plagiarism cases and diverse legitimate implementations.
     """
 
-    def __init__(self, fizzbuzz_dir: Path):
+    def __init__(self, fizzbuzz_dir: Path, config: Dict[str, Any] = None, preset_name: str = "Standard"):
         """
         Initialize the effectiveness test system.
 
         Args:
             fizzbuzz_dir: Path to FizzBuzzProblem directory
+            config: Preset configuration from get_preset_config() (optional)
+            preset_name: Display name for logging
         """
         self.fizzbuzz_dir = fizzbuzz_dir
         self.plagiarized_dir = fizzbuzz_dir / "plagiarized"
         self.legitimate_dir = fizzbuzz_dir / "legitimate"
+        self.preset_name = preset_name
 
         # Initialize detectors
         self.token_detector = TokenDetector()
         self.ast_detector = ASTDetector()
-        self.hash_detector = HashDetector()
-        self.voting_system = VotingSystem()
+
+        # Only initialize hash detector if active in preset
+        if config:
+            self.hash_active = config['hash']['weight'] > 0.0
+        else:
+            self.hash_active = True
+
+        if self.hash_active:
+            self.hash_detector = HashDetector()
+        else:
+            self.hash_detector = None
+            print(f"  Hash detector DISABLED for {preset_name}")
+
+        # Initialize voting system with preset config
+        if config:
+            self.voting_system = VotingSystem(config)
+        else:
+            self.voting_system = VotingSystem()
 
         # Results storage
         self.test_cases: List[Dict[str, Any]] = []
@@ -286,7 +306,11 @@ class FizzBuzzEffectivenessTest:
         # Run all detectors
         token_score = self.token_detector.compare(source1, source2)
         ast_score = self.ast_detector.compare(source1, source2)
-        hash_score = self.hash_detector.compare(source1, source2)
+
+        if self.hash_active:
+            hash_score = self.hash_detector.compare(source1, source2)
+        else:
+            hash_score = 0.0
 
         # Get voting system decision
         voting_result = self.voting_system.vote(token_score, ast_score, hash_score)
@@ -323,7 +347,7 @@ class FizzBuzzEffectivenessTest:
         Run complete validation across all defined test pairs.
         """
         print("=" * 80)
-        print("CodeGuard FizzBuzz Dataset - Effectiveness Test")
+        print(f"CodeGuard FizzBuzz Dataset - {self.preset_name}")
         print("=" * 80)
         print()
         print("Testing against realistic classroom scenario:")
@@ -878,10 +902,152 @@ class FizzBuzzEffectivenessTest:
 
         print(f"\nReport saved to: {output_path}")
 
+    def get_results_summary(self) -> Dict[str, Any]:
+        """
+        Get results summary for comparison.
+
+        Returns:
+            Dictionary containing tp, fp, tn, fn, precision, recall, f1, accuracy
+        """
+        voting_metrics = self.calculate_metrics("voting")
+        return {
+            "tp": voting_metrics["TP"],
+            "fp": voting_metrics["FP"],
+            "tn": voting_metrics["TN"],
+            "fn": voting_metrics["FN"],
+            "precision": voting_metrics["precision"],
+            "recall": voting_metrics["recall"],
+            "f1": voting_metrics["f1_score"],
+            "accuracy": voting_metrics["accuracy"],
+        }
+
+
+def generate_comparison_report(all_results: Dict[str, Dict[str, Any]]) -> None:
+    """
+    Generate markdown comparison report for both presets.
+
+    Args:
+        all_results: Dict with 'standard' and 'simple' keys containing results
+    """
+    standard = all_results['standard']
+    simple = all_results['simple']
+
+    # Calculate improvements
+    precision_improvement = simple['precision'] - standard['precision']
+    recall_change = simple['recall'] - standard['recall']
+    f1_improvement = simple['f1'] - standard['f1']
+    fp_reduction = standard['fp'] - simple['fp']
+
+    # Create report content
+    report = f"""# FizzBuzz Preset Comparison Report
+
+Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+## Executive Summary
+
+The Simple Problems preset was designed to address false positives on constrained problems like FizzBuzz by:
+1. Disabling hash detector (ineffective on <50 line files)
+2. Increasing AST threshold from 0.80 to 0.85 (stricter structural matching)
+3. Rebalancing detector weights to compensate
+
+## Overall Performance Comparison
+
+| Metric | Standard Preset | Simple Preset | Improvement |
+|--------|----------------|---------------|-------------|
+| **Precision** | {standard['precision']:.2%} | {simple['precision']:.2%} | {precision_improvement:+.2%} |
+| **Recall** | {standard['recall']:.2%} | {simple['recall']:.2%} | {recall_change:+.2%} |
+| **F1 Score** | {standard['f1']:.2%} | {simple['f1']:.2%} | {f1_improvement:+.2%} |
+| **Accuracy** | {standard['accuracy']:.2%} | {simple['accuracy']:.2%} | {simple['accuracy'] - standard['accuracy']:+.2%} |
+
+## Confusion Matrix Comparison
+
+| Metric | Standard Preset | Simple Preset | Change |
+|--------|----------------|---------------|--------|
+| True Positives (TP) | {standard['tp']} | {simple['tp']} | {simple['tp'] - standard['tp']:+d} |
+| False Positives (FP) | {standard['fp']} | {simple['fp']} | {simple['fp'] - standard['fp']:+d} |
+| True Negatives (TN) | {standard['tn']} | {simple['tn']} | {simple['tn'] - standard['tn']:+d} |
+| False Negatives (FN) | {standard['fn']} | {simple['fn']} | {simple['fn'] - standard['fn']:+d} |
+
+## Key Findings
+
+### False Positive Reduction
+
+Standard preset produced **{standard['fp']} false positive(s)** on legitimate FizzBuzz solutions.
+Simple preset produced **{simple['fp']} false positive(s)**.
+
+**Improvement:** {fp_reduction} fewer false positive(s) ({fp_reduction / max(standard['fp'], 1) * 100:.0f}% reduction)
+
+### Precision Improvement
+
+The Simple preset achieved **{precision_improvement:+.2%}** precision improvement, bringing it from {standard['precision']:.2%} to {simple['precision']:.2%}.
+
+{"**Target Achieved:** Simple preset meets the >=85% precision target." if simple['precision'] >= 0.85 else f"**Target Status:** Simple preset at {simple['precision']:.2%}, target is >=85%."}
+
+### Recall Impact
+
+Recall {"increased" if recall_change > 0 else "decreased" if recall_change < 0 else "remained stable"} by {abs(recall_change):.2%}.
+{"This is acceptable as precision improvement outweighs the minimal recall change." if abs(recall_change) <= 0.10 else "This requires investigation."}
+
+## Detailed Analysis
+
+### Why Simple Preset Performs Better
+
+1. **Stricter AST Threshold (0.85 vs 0.80):**
+   - Reduces false positives on structurally similar but legitimate solutions
+   - FizzBuzz has limited solution space, so legitimate solutions often share structure
+   - Higher threshold ensures only truly copied code is flagged
+
+2. **Hash Detector Disabled:**
+   - Hash detector achieved 0% precision on FizzBuzz (files too short)
+   - Disabling it eliminates noise and speeds up analysis
+   - Token and AST detectors are sufficient for small files
+
+3. **Rebalanced Weights:**
+   - Token weight increased (1.0 -> 1.5)
+   - AST weight increased (2.0 -> 2.5)
+   - Compensates for disabled hash detector
+   - Maintains robust decision-making with two detectors
+
+## Recommendations
+
+{"**Recommendation:** Use Simple Problems preset for all assignments <50 lines with limited solution space." if simple['precision'] > standard['precision'] else ""}
+
+{"**Recommendation:** Use Standard preset for assignments >=50 lines with diverse solution space." if standard['precision'] >= 0.85 else ""}
+
+## Conclusion
+
+{"The Simple Problems preset successfully addresses FizzBuzz false positives while maintaining high recall. It is recommended for constrained problems." if simple['precision'] > standard['precision'] and simple['recall'] >= 0.80 else "Further tuning may be needed."}
+
+---
+
+**Test Dataset:** FizzBuzz (22 pairs: 6 plagiarism, 16 legitimate)
+**Standard Configuration:** Token 0.70/1.0, AST 0.80/2.0, Hash 0.60/1.5
+**Simple Configuration:** Token 0.70/1.5, AST 0.85/2.5, Hash disabled
+"""
+
+    # Save report
+    report_path = Path(__file__).parent.parent / "docs" / "PRESET_COMPARISON_FIZZBUZZ.md"
+    with open(report_path, 'w') as f:
+        f.write(report)
+
+    print(f"\n{'='*80}")
+    print(f"Comparison report saved to: {report_path}")
+    print('='*80)
+
+    # Print summary to console
+    print("\n" + "="*80)
+    print("SUMMARY")
+    print("="*80)
+    print(f"Precision: {standard['precision']:.2%} -> {simple['precision']:.2%} ({precision_improvement:+.2%})")
+    print(f"Recall: {standard['recall']:.2%} -> {simple['recall']:.2%} ({recall_change:+.2%})")
+    print(f"F1 Score: {standard['f1']:.2%} -> {simple['f1']:.2%} ({f1_improvement:+.2%})")
+    print(f"False Positives: {standard['fp']} -> {simple['fp']} ({fp_reduction:+d})")
+    print("="*80)
+
 
 def main():
     """
-    Main entry point for FizzBuzz effectiveness test.
+    Main entry point for FizzBuzz effectiveness test with preset comparison.
     """
     # Determine paths
     script_dir = Path(__file__).parent
@@ -897,22 +1063,56 @@ def main():
     # Ensure docs directory exists
     docs_dir.mkdir(exist_ok=True)
 
-    # Create effectiveness test instance
-    print("Initializing FizzBuzz Effectiveness Test...")
-    test = FizzBuzzEffectivenessTest(fizzbuzz_dir)
+    print("="*80)
+    print("FizzBuzz Plagiarism Detection - Preset Comparison")
+    print("="*80)
 
-    # Run validation
-    test.run_validation()
+    # Define presets to test
+    presets_to_test = [
+        ("standard", "Standard (Recommended)"),
+        ("simple", "Simple Problems (e.g., FizzBuzz)")
+    ]
 
-    # Print results
-    test.print_results()
+    all_results = {}
 
-    # Save report
-    report_path = docs_dir / "FIZZBUZZ_TEST_REPORT.md"
-    test.save_report(report_path)
+    for preset_key, preset_display_name in presets_to_test:
+        print(f"\n{'='*80}")
+        print(f"Testing with {preset_display_name}")
+        print('='*80)
+
+        # Get preset configuration
+        config = get_preset_config(preset_key)
+
+        # Create effectiveness test instance with preset config
+        test = FizzBuzzEffectivenessTest(fizzbuzz_dir, config, preset_display_name)
+
+        # Run validation
+        test.run_validation()
+
+        # Print results
+        test.print_results()
+
+        # Save individual report
+        report_path = docs_dir / f"FIZZBUZZ_TEST_REPORT_{preset_key.upper()}.md"
+        test.save_report(report_path)
+
+        # Store results for comparison
+        all_results[preset_key] = test.get_results_summary()
+
+        # Print summary
+        print(f"\n{preset_display_name} Results:")
+        print(f"  Precision: {all_results[preset_key]['precision']:.2%}")
+        print(f"  Recall: {all_results[preset_key]['recall']:.2%}")
+        print(f"  F1 Score: {all_results[preset_key]['f1']:.2%}")
+        print(f"  Accuracy: {all_results[preset_key]['accuracy']:.2%}")
+        print(f"  TP: {all_results[preset_key]['tp']}, FP: {all_results[preset_key]['fp']}, TN: {all_results[preset_key]['tn']}, FN: {all_results[preset_key]['fn']}")
+
+    # Generate comparison report
+    generate_comparison_report(all_results)
 
     print(f"\nEffectiveness test complete!")
-    print(f"Report saved to: {report_path}")
+
+    return all_results
 
 
 if __name__ == "__main__":

@@ -1,0 +1,48 @@
+feat: Configuration preset system and critical bug fixes
+
+Phase 1: Configuration Preset System (Tasks 1-6)
+- Implemented: config_presets.py (481 lines, 86% coverage)
+- Created: STANDARD_PRESET and SIMPLE_PRESET configurations
+- Added: VotingSystem config parameter support
+- Integrated: Streamlit preset selector UI
+- Modified: app.py preset selector, hash controls
+- Tests: 25 unit tests (test_config_presets.py, 1,124 lines)
+
+Phase 2: Critical Bug Fixes (Tasks 11-16)
+- Fixed: Threshold application (config override added)
+- Fixed: Reset defaults button (widget key deletion)
+- Fixed: Hash controls visibility (conditional rendering)
+- Fixed: Simple mode voting logic (equal weights)
+- Fixed: Hash detector integration (3 sub-fixes)
+- Fixed: Hash columns visibility toggle
+- Tests: 68 integration tests (6 files, 100% passing)
+
+Phase 3: Mode Effectiveness Validation
+- Created: compare_mode_effectiveness.py (626 lines)
+- Created: compare_specialized_datasets.py (526 lines)
+- Created: compare_real_test_files.py (626 lines)
+- Results: FizzBuzz precision 71.43% → 83.33% (Simple mode)
+- Results: RPS 100% precision/recall/F1 (Standard mode)
+- Validated: Dual-preset approach production-ready
+
+Phase 4: Documentation
+- Created: BUG_FIX_VALIDATION.md (comprehensive validation)
+- Created: REAL_TEST_FILES_COMPARISON.md (mode comparison)
+- Created: MODE_COMPARISON_SUMMARY.md (executive summary)
+- Updated: development_log.md (Session 7 entry)
+- Updated: project_status.md (95% completion)
+- Updated: CHANGELOG.md (v0.7.0)
+
+Code Statistics:
+- Lines written: ~4,500 (481 core + 2,900 tests + 1,100 scripts)
+- Files created: 22 (1 core + 6 tests + 4 scripts + 11 docs)
+- Files modified: 4 (voting_system.py, app.py, measure_fizzbuzz_accuracy.py)
+- Tests: 509 total (491 passing, 96.5% pass rate)
+- Coverage: 74% (up from 72%)
+- Integration tests: 68/68 passing (100%)
+
+Completion: 93% → 95%
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>

@@ -27,8 +27,9 @@ import pandas as pd
 from pathlib import Path
 import json
 from datetime import datetime
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict, Any
 import sys
+import logging
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
@@ -46,6 +47,10 @@ from src.database.operations import (
     get_job_results,
     get_job_summary,
 )
+from src.core import get_preset_config
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 # ============================================================================
 # CONSTANTS
@@ -106,25 +111,46 @@ def initialize_session_state():
     if "show_combined_score" not in st.session_state:
         st.session_state.show_combined_score = True
 
-    # Voting system configuration - Detection thresholds
+    # Initialize preset selection (default to Standard)
+    if "selected_preset" not in st.session_state:
+        st.session_state.selected_preset = "Standard (Recommended)"
+    if "previous_preset" not in st.session_state:
+        st.session_state.previous_preset = "Standard (Recommended)"
+
+    # Initialize voting system configuration from preset
+    # This ensures initial values match the selected preset
     if "token_threshold" not in st.session_state:
-        st.session_state.token_threshold = 0.70
-    if "ast_threshold" not in st.session_state:
-        st.session_state.ast_threshold = 0.80
-    if "hash_threshold" not in st.session_state:
-        st.session_state.hash_threshold = 0.60
+        from src.core import get_preset
+        # Get the preset based on the selected preset
+        preset_map = {
+            "Standard (Recommended)": "standard",
+            "Simple Problems (e.g., FizzBuzz)": "simple"
+        }
+        preset_name = preset_map.get(st.session_state.selected_preset, "standard")
+        preset_config = get_preset(preset_name)
 
-    # Voting system configuration - Detector weights
-    if "token_weight" not in st.session_state:
-        st.session_state.token_weight = 1.0
-    if "ast_weight" not in st.session_state:
-        st.session_state.ast_weight = 2.0
-    if "hash_weight" not in st.session_state:
-        st.session_state.hash_weight = 1.5
-
-    # Voting system configuration - Decision threshold
-    if "decision_threshold" not in st.session_state:
-        st.session_state.decision_threshold = 0.50
+        # Initialize all values from the preset
+        st.session_state.token_threshold = preset_config['token']['threshold']
+        st.session_state.ast_threshold = preset_config['ast']['threshold']
+        st.session_state.hash_threshold = preset_config['hash']['threshold']
+        st.session_state.token_weight = preset_config['token']['weight']
+        st.session_state.ast_weight = preset_config['ast']['weight']
+        st.session_state.hash_weight = preset_config['hash']['weight']
+        st.session_state.decision_threshold = preset_config.get('decision_threshold', 0.50)
+    else:
+        # Individual checks for other values in case they're missing
+        if "ast_threshold" not in st.session_state:
+            st.session_state.ast_threshold = 0.80
+        if "hash_threshold" not in st.session_state:
+            st.session_state.hash_threshold = 0.60
+        if "token_weight" not in st.session_state:
+            st.session_state.token_weight = 1.0
+        if "ast_weight" not in st.session_state:
+            st.session_state.ast_weight = 2.0
+        if "hash_weight" not in st.session_state:
+            st.session_state.hash_weight = 1.5
+        if "decision_threshold" not in st.session_state:
+            st.session_state.decision_threshold = 0.50
 
 
 # ============================================================================
@@ -172,18 +198,60 @@ def validate_uploaded_files(files) -> Tuple[bool, str]:
 
 
 # ============================================================================
+# CONFIGURATION VALIDATION
+# ============================================================================
+
+
+def validate_config(config: Dict[str, Any]) -> None:
+    """
+    Validate preset configuration has required structure.
+
+    Args:
+        config: Configuration dictionary to validate
+
+    Raises:
+        ValueError: If config is invalid or missing required keys
+
+    Example:
+        >>> from src.core import get_preset_config
+        >>> config = get_preset_config("standard")
+        >>> validate_config(config)  # No exception raised
+        >>> validate_config({})  # Raises ValueError
+    """
+    required_keys = ['token', 'ast', 'hash']
+    for key in required_keys:
+        if key not in config:
+            raise ValueError(f"Config missing required key: '{key}'")
+
+        detector_config = config[key]
+        if 'threshold' not in detector_config:
+            raise ValueError(f"Config['{key}'] missing 'threshold'")
+        if 'weight' not in detector_config:
+            raise ValueError(f"Config['{key}'] missing 'weight'")
+        if 'confidence_weight' not in detector_config:
+            raise ValueError(f"Config['{key}'] missing 'confidence_weight'")
+
+    # Verify at least one detector is active
+    total_weight = sum(config[k]['weight'] for k in required_keys)
+    if total_weight <= 0:
+        raise ValueError("Config must have at least one active detector (total weight > 0)")
+
+    logger.debug("Config validation passed")
+
+
+# ============================================================================
 # ANALYSIS ENGINE
 # ============================================================================
 
 
-def analyze_files(files, threshold: float) -> pd.DataFrame:
+def analyze_files(files, threshold: float, config: Optional[Dict[str, Any]] = None) -> pd.DataFrame:
     """
     Analyze all file pairs using all three detectors (Token, AST, Hash) with VotingSystem.
 
     This function:
     1. Creates instances of TokenDetector, ASTDetector, HashDetector, and VotingSystem
     2. Generates all possible file pairs (N*(N-1)/2 combinations)
-    3. Analyzes each pair using all three detection methods
+    3. Analyzes each pair using all three detection methods (conditionally executes hash)
     4. Uses VotingSystem to make final plagiarism determination
     5. Displays progress in real-time with detector-specific status
     6. Returns results as a formatted DataFrame with voting metrics
@@ -191,6 +259,8 @@ def analyze_files(files, threshold: float) -> pd.DataFrame:
     Args:
         files: List of uploaded file objects
         threshold: Base similarity threshold (0.0-1.0) - legacy parameter, not used
+        config: Preset configuration dict from get_preset_config().
+                If None, uses STANDARD_PRESET as default.
 
     Returns:
         pd.DataFrame: Results with columns:
@@ -199,6 +269,7 @@ def analyze_files(files, threshold: float) -> pd.DataFrame:
             - token_similarity: Token similarity (0.0-1.0)
             - ast_similarity: AST similarity (0.0-1.0)
             - hash_similarity: Hash similarity (0.0-1.0)
+            - hash_active: Boolean (True if hash ran, False if skipped)
             - plagiarism_detected: Boolean from voting system
             - confidence_score: Confidence score (0.0-1.0)
             - confidence_level: Level string ('Very High', 'High', etc.)
@@ -206,37 +277,47 @@ def analyze_files(files, threshold: float) -> pd.DataFrame:
             - token_vote: Boolean - did token detector vote for plagiarism
             - ast_vote: Boolean - did AST detector vote for plagiarism
             - hash_vote: Boolean - did hash detector vote for plagiarism
+            - preset_name: String - which preset was used
             - Plus display columns with percentages and verdicts
     """
-    # Create detector instances with thresholds from session state
-    token_detector = TokenDetector(threshold=st.session_state.token_threshold)
-    ast_detector = ASTDetector(threshold=st.session_state.ast_threshold)
-    hash_detector = HashDetector(
-        threshold=st.session_state.hash_threshold, k=HASH_K_GRAM, w=HASH_WINDOW
-    )
+    # Default to standard preset if not provided
+    if config is None:
+        config = get_preset_config("standard")
+        preset_name = "Standard (Default)"
+        logger.info("No config provided, using STANDARD preset as default")
+    else:
+        preset_name = config.get('name', 'Custom')
+        logger.info(f"Using provided config: {preset_name}")
 
-    # Create custom configuration from session state
-    custom_config = {
-        "token": {
-            "threshold": st.session_state.token_threshold,
-            "weight": st.session_state.token_weight,
-            "confidence_weight": 0.3,  # Keep confidence weights fixed
-        },
-        "ast": {
-            "threshold": st.session_state.ast_threshold,
-            "weight": st.session_state.ast_weight,
-            "confidence_weight": 0.4,
-        },
-        "hash": {
-            "threshold": st.session_state.hash_threshold,
-            "weight": st.session_state.hash_weight,
-            "confidence_weight": 0.3,
-        },
-        "decision_threshold": st.session_state.decision_threshold,
-    }
+    # Validate configuration
+    validate_config(config)
 
-    # Create VotingSystem instance with custom configuration
-    voter = VotingSystem(config=custom_config)
+    # Log configuration details
+    logger.info(f"Starting plagiarism detection with preset: {preset_name}")
+    logger.info(f"Detector weights - Token: {config['token']['weight']:.1f}, "
+                f"AST: {config['ast']['weight']:.1f}, Hash: {config['hash']['weight']:.1f}")
+    logger.info(f"Total files: {len(files)}")
+
+    # Determine if hash detector is active
+    hash_active = config['hash']['weight'] > 0.0
+    logger.info(f"Hash detector status: {'ACTIVE' if hash_active else 'DISABLED (weight=0.0)'}")
+
+    # Create detector instances with thresholds from config
+    token_detector = TokenDetector(threshold=config['token']['threshold'])
+    ast_detector = ASTDetector(threshold=config['ast']['threshold'])
+
+    # Only create hash detector if it will be used
+    if hash_active:
+        hash_detector = HashDetector(
+            threshold=config['hash']['threshold'], k=HASH_K_GRAM, w=HASH_WINDOW
+        )
+        logger.info(f"Hash detector initialized with threshold={config['hash']['threshold']:.2f}, k={HASH_K_GRAM}, w={HASH_WINDOW}")
+    else:
+        hash_detector = None
+        logger.info("Hash detector initialization SKIPPED (disabled in config)")
+
+    # Create VotingSystem instance with configuration
+    voter = VotingSystem(config=config)
 
     results = []
 
@@ -277,11 +358,13 @@ def analyze_files(files, threshold: float) -> pd.DataFrame:
             cosine_sim = token_detector._calculate_cosine_similarity(tokens1, tokens2)
             token_sim = (jaccard_sim + cosine_sim) / 2.0
 
-            token_verdict = "🚨 FLAGGED" if token_sim >= TOKEN_THRESHOLD else "✅ CLEAR"
+            token_verdict = "🚨 FLAGGED" if token_sim >= config['token']['threshold'] else "✅ CLEAR"
+            logger.debug(f"Token detector: {file1.name} vs {file2.name}, score={token_sim:.3f}")
         except Exception as e:
             st.warning(f"Token Detector error on {file1.name} vs {file2.name}: {str(e)[:50]}")
             jaccard_sim, cosine_sim, token_sim = 0.0, 0.0, 0.0
             token_verdict = "⚠️ ERROR"
+            logger.error(f"Token detector error: {str(e)}")
 
         # ===== AST DETECTOR =====
         status_text.text(f"AST Detector: Pair {idx + 1}/{total_pairs} - {file1.name} vs {file2.name}")
@@ -289,25 +372,40 @@ def analyze_files(files, threshold: float) -> pd.DataFrame:
 
         try:
             ast_sim = ast_detector.compare(code1, code2)
-            ast_verdict = "🚨 FLAGGED" if ast_sim >= AST_THRESHOLD else "✅ CLEAR"
+            ast_verdict = "🚨 FLAGGED" if ast_sim >= config['ast']['threshold'] else "✅ CLEAR"
+            logger.debug(f"AST detector: {file1.name} vs {file2.name}, score={ast_sim:.3f}")
         except Exception as e:
             st.warning(f"AST Detector error on {file1.name} vs {file2.name}: {str(e)[:50]}")
             ast_sim = 0.0
             ast_verdict = "⚠️ ERROR"
+            logger.error(f"AST detector error: {str(e)}")
 
-        # ===== HASH DETECTOR =====
-        status_text.text(
-            f"Hash Detector: Pair {idx + 1}/{total_pairs} - {file1.name} vs {file2.name}"
-        )
-        progress_bar.progress(base_progress + (1.0 / total_pairs))
+        # ===== HASH DETECTOR (CONDITIONAL) =====
+        # Performance note: Skipping hash detector on simple problems saves ~30-40% execution time
+        # Hash detector uses Winnowing algorithm which is expensive on small files
+        # In Simple preset (files <50 lines), hash is ineffective anyway (0% precision)
+        if hash_active:
+            status_text.text(
+                f"Hash Detector: Pair {idx + 1}/{total_pairs} - {file1.name} vs {file2.name}"
+            )
+            progress_bar.progress(base_progress + (1.0 / total_pairs))
 
-        try:
-            hash_sim = hash_detector.compare(code1, code2)
-            hash_verdict = "🚨 FLAGGED" if hash_sim >= HASH_THRESHOLD else "✅ CLEAR"
-        except Exception as e:
-            st.warning(f"Hash Detector error on {file1.name} vs {file2.name}: {str(e)[:50]}")
+            try:
+                hash_sim = hash_detector.compare(code1, code2)
+                hash_verdict = "🚨 FLAGGED" if hash_sim >= config['hash']['threshold'] else "✅ CLEAR"
+                logger.debug(f"Hash detector executed: {file1.name} vs {file2.name}, score={hash_sim:.3f}")
+            except Exception as e:
+                st.warning(f"Hash Detector error on {file1.name} vs {file2.name}: {str(e)[:50]}")
+                hash_sim = 0.0
+                hash_verdict = "⚠️ ERROR"
+                logger.error(f"Hash detector error: {str(e)}")
+        else:
+            # Hash detector SKIPPED - weight is 0.0
             hash_sim = 0.0
-            hash_verdict = "⚠️ ERROR"
+            hash_verdict = "⏭️ SKIPPED"
+            logger.debug(f"Hash detector SKIPPED (disabled): {file1.name} vs {file2.name}")
+            # Update progress to show completion
+            progress_bar.progress(base_progress + (1.0 / total_pairs))
 
         # ===== VOTING SYSTEM =====
         status_text.text(
@@ -317,6 +415,13 @@ def analyze_files(files, threshold: float) -> pd.DataFrame:
         try:
             # Use VotingSystem for unified decision
             voting_result = voter.vote(token_sim=token_sim, ast_sim=ast_sim, hash_sim=hash_sim)
+
+            # DEBUG: Log voting decision for this pair
+            logger.info(f"\nPair {idx + 1}: {file1.name} vs {file2.name}")
+            logger.info(f"  Token: {token_sim:.3f} {'✓' if voting_result['votes']['token'] > 0 else '✗'}")
+            logger.info(f"  AST: {ast_sim:.3f} {'✓' if voting_result['votes']['ast'] > 0 else '✗'}")
+            logger.info(f"  Hash: {hash_sim:.3f} {'✓' if voting_result['votes']['hash'] > 0 else '⏭ SKIPPED' if config['hash']['weight'] == 0 else '✗'}")
+            logger.info(f"  Result: {'PLAGIARIZED' if voting_result['is_plagiarized'] else 'CLEAR'}")
 
             # Extract voting information
             is_plagiarized = voting_result["is_plagiarized"]
@@ -331,6 +436,13 @@ def analyze_files(files, threshold: float) -> pd.DataFrame:
             else:
                 overall_status = f"✅ CLEAR ({confidence_level})"
 
+            # Log voting decision
+            logger.info(
+                f"Pair {idx + 1}/{total_pairs}: {file1.name} vs {file2.name} - "
+                f"{'PLAGIARISM' if is_plagiarized else 'CLEAR'} "
+                f"(confidence={confidence_score:.3f}, weighted_votes={weighted_votes:.2f})"
+            )
+
         except Exception as e:
             st.warning(f"Voting System error on {file1.name} vs {file2.name}: {str(e)[:50]}")
             is_plagiarized = False
@@ -339,6 +451,7 @@ def analyze_files(files, threshold: float) -> pd.DataFrame:
             votes = {"token": False, "ast": False, "hash": False}
             weighted_votes = 0.0
             overall_status = "⚠️ ERROR"
+            logger.error(f"Voting system error: {str(e)}")
 
         # Store result with all detector metrics and voting information
         results.append(
@@ -352,6 +465,7 @@ def analyze_files(files, threshold: float) -> pd.DataFrame:
                 "token_cosine": cosine_sim,
                 "ast_similarity": ast_sim,
                 "hash_similarity": hash_sim,
+                "hash_active": hash_active,  # NEW: indicates if hash ran
                 # Voting results
                 "plagiarism_detected": is_plagiarized,
                 "confidence_score": confidence_score,
@@ -360,6 +474,7 @@ def analyze_files(files, threshold: float) -> pd.DataFrame:
                 "token_vote": votes["token"],
                 "ast_vote": votes["ast"],
                 "hash_vote": votes["hash"],
+                "preset_name": preset_name,  # NEW: which preset was used
                 # Display columns (percentages)
                 "Token Similarity (%)": token_sim * 100,
                 "Token Jaccard (%)": jaccard_sim * 100,
@@ -586,7 +701,7 @@ def render_sidebar():
     Render sidebar with app information and configuration.
 
     Displays:
-        - App title and description
+        - Detection mode preset selector (NEW)
         - Voting system configuration controls (thresholds, weights, decision threshold)
         - Reset to defaults button
         - Current configuration display
@@ -596,6 +711,146 @@ def render_sidebar():
         - Database status
         - Instructions
     """
+    # ========================================
+    # DETECTION CONFIGURATION (PRESET SELECTOR)
+    # ========================================
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("Detection Configuration")
+
+    # Use key parameter to bind radio button directly to session state
+    detection_mode = st.sidebar.radio(
+        "Detection Mode",
+        options=["Standard (Recommended)", "Simple Problems (e.g., FizzBuzz)"],
+        index=0 if st.session_state.selected_preset == "Standard (Recommended)" else 1,
+        key="selected_preset",  # CRITICAL: Bind directly to session state
+        help="""
+**Standard Mode (Recommended):**
+- For typical assignments (50+ lines)
+- Games, data structures, algorithms
+- Uses all three detectors (Token, AST, Hash)
+- 100% precision on realistic code
+
+**Simple Problems Mode:**
+- For short assignments (<50 lines)
+- FizzBuzz, factorial, palindrome checks
+- Hash detector DISABLED (ineffective on small files)
+- Stricter AST threshold to reduce false positives
+        """,
+    )
+
+    # Handle preset changes
+    if st.session_state.selected_preset != st.session_state.get('previous_preset', st.session_state.selected_preset):
+        # Preset changed - UPDATE ALL SESSION STATE VALUES TO MATCH NEW PRESET
+        st.session_state.previous_preset = st.session_state.selected_preset
+
+        # Get new preset configuration
+        preset_map = {
+            "Standard (Recommended)": "standard",
+            "Simple Problems (e.g., FizzBuzz)": "simple",
+        }
+        new_preset_name = preset_map[st.session_state.selected_preset]
+
+        from src.core import get_preset
+        new_preset_config = get_preset(new_preset_name)
+
+        # CRITICAL FIX: Delete ALL widget keys before setting new values
+        # This prevents Streamlit's "cannot modify after widget instantiation" error
+        widget_keys = [
+            'token_threshold', 'ast_threshold', 'hash_threshold',
+            'token_weight', 'ast_weight', 'hash_weight',
+            'decision_threshold'
+        ]
+
+        logger.info(f"PRESET CHANGE: {st.session_state.previous_preset} → {st.session_state.selected_preset}")
+        logger.info(f"Deleting widget keys and resetting to preset defaults...")
+
+        for key in widget_keys:
+            if key in st.session_state:
+                old_value = st.session_state[key]
+                del st.session_state[key]
+                logger.debug(f"  Deleted {key} (was {old_value})")
+
+        # Set new preset values in session state
+        st.session_state.token_threshold = new_preset_config['token']['threshold']
+        st.session_state.ast_threshold = new_preset_config['ast']['threshold']
+        st.session_state.hash_threshold = new_preset_config['hash']['threshold']
+        st.session_state.token_weight = new_preset_config['token']['weight']
+        st.session_state.ast_weight = new_preset_config['ast']['weight']
+        st.session_state.hash_weight = new_preset_config['hash']['weight']  # ← CRITICAL: Now updates to 0.0 in Simple mode!
+        st.session_state.decision_threshold = new_preset_config.get('decision_threshold', 0.50)
+
+        logger.info(f"AFTER PRESET CHANGE:")
+        logger.info(f"  Token: threshold={st.session_state.token_threshold:.2f}, weight={st.session_state.token_weight:.1f}")
+        logger.info(f"  AST: threshold={st.session_state.ast_threshold:.2f}, weight={st.session_state.ast_weight:.1f}")
+        logger.info(f"  Hash: threshold={st.session_state.hash_threshold:.2f}, weight={st.session_state.hash_weight:.1f}")
+        logger.info(f"  Decision threshold: {st.session_state.decision_threshold:.2f}")
+
+        # Clear previous analysis results when preset changes
+        if "analysis_results" in st.session_state:
+            st.session_state.analysis_results = None
+            st.session_state.analysis_completed = False
+
+        # Show success message
+        st.sidebar.success(f"Switched to {st.session_state.selected_preset}")
+        st.rerun()
+
+    # Show configuration details in expander
+    with st.sidebar.expander("View Configuration Details", expanded=False):
+        from src.core import get_preset
+
+        # Map display name to preset name
+        preset_map = {
+            "Standard (Recommended)": "standard",
+            "Simple Problems (e.g., FizzBuzz)": "simple",
+        }
+        preset_name = preset_map[detection_mode]
+
+        # Get and display preset configuration
+        preset_config = get_preset(preset_name)
+
+        st.markdown(f"**{preset_config['name']}**")
+        st.caption(preset_config["description"])
+
+        st.markdown("**Detector Configuration:**")
+
+        # Token detector
+        st.markdown("Token Detector:")
+        st.code(
+            f"""Threshold: {preset_config['token']['threshold']}
+Weight: {preset_config['token']['weight']}
+Confidence: {preset_config['token']['confidence_weight']}"""
+        )
+
+        # AST detector
+        st.markdown("AST Detector:")
+        st.code(
+            f"""Threshold: {preset_config['ast']['threshold']}
+Weight: {preset_config['ast']['weight']}
+Confidence: {preset_config['ast']['confidence_weight']}"""
+        )
+
+        # Hash detector (highlight if disabled)
+        if preset_config["hash"]["weight"] == 0.0:
+            st.markdown("Hash Detector: **DISABLED**")
+            st.caption("Hash detector is disabled in this mode")
+        else:
+            st.markdown("Hash Detector: **ACTIVE**")
+            st.code(
+                f"""Threshold: {preset_config['hash']['threshold']}
+Weight: {preset_config['hash']['weight']}
+Confidence: {preset_config['hash']['confidence_weight']}"""
+            )
+
+        # Decision threshold
+        total_votes = (
+            preset_config["token"]["weight"]
+            + preset_config["ast"]["weight"]
+            + preset_config["hash"]["weight"]
+        )
+        decision_threshold = 0.50 * total_votes
+        st.markdown("**Decision Threshold:**")
+        st.code(f"{decision_threshold} votes (50% of {total_votes})")
+
     st.sidebar.markdown("---")
 
     # ===== VOTING SYSTEM CONFIGURATION =====
@@ -603,80 +858,117 @@ def render_sidebar():
         st.caption("Minimum scores for detectors to vote for plagiarism")
 
         # Token threshold slider
-        st.session_state.token_threshold = st.slider(
+        # FIX: Remove assignment that overwrites session_state
+        # Use key parameter for automatic session_state sync
+        st.slider(
             "Token Threshold",
             min_value=0.5,
             max_value=0.9,
             value=st.session_state.token_threshold,
             step=0.05,
             help="Minimum similarity score for Token detector to flag plagiarism. Lower = more sensitive.",
-            key="token_threshold_slider",
+            key="token_threshold",  # Key matches session_state variable name
         )
 
         # AST threshold slider
-        st.session_state.ast_threshold = st.slider(
+        # FIX: Remove assignment that overwrites session_state
+        st.slider(
             "AST Threshold",
             min_value=0.6,
             max_value=0.95,
             value=st.session_state.ast_threshold,
             step=0.05,
             help="Minimum similarity score for AST detector to flag plagiarism. AST detects structural similarity.",
-            key="ast_threshold_slider",
+            key="ast_threshold",  # Key matches session_state variable name
         )
 
-        # Hash threshold slider
-        st.session_state.hash_threshold = st.slider(
-            "Hash Threshold",
-            min_value=0.4,
-            max_value=0.8,
-            value=st.session_state.hash_threshold,
-            step=0.05,
-            help="Minimum similarity score for Hash detector to flag plagiarism. Hash detects partial copying.",
-            key="hash_threshold_slider",
-        )
+        # Hash threshold slider (only show if hash detector is enabled)
+        if st.session_state.hash_weight > 0:
+            st.slider(
+                "Hash Threshold",
+                min_value=0.4,
+                max_value=0.8,
+                value=st.session_state.hash_threshold,
+                step=0.05,
+                help="Minimum similarity score for Hash detector to flag plagiarism. Hash detects partial copying.",
+                key="hash_threshold",  # Key matches session_state variable name
+            )
+        else:
+            # Hash disabled - ensure value exists in session_state for when it's re-enabled
+            if 'hash_threshold' not in st.session_state:
+                from src.core import get_preset
+                preset_map = {
+                    "Standard (Recommended)": "standard",
+                    "Simple Problems (e.g., FizzBuzz)": "simple"
+                }
+                preset_name = preset_map.get(st.session_state.selected_preset, "standard")
+                preset_config = get_preset(preset_name)
+                st.session_state.hash_threshold = preset_config['hash']['threshold']
+            st.info("Hash detector disabled in Simple Problems mode")
 
     # ===== VOTING WEIGHTS =====
     with st.sidebar.expander("Detector Weights", expanded=False):
         st.caption("Influence of each detector on final decision")
 
         # Token weight slider
-        st.session_state.token_weight = st.slider(
+        # FIX: Remove assignment that overwrites session_state
+        st.slider(
             "Token Weight",
             min_value=0.5,
             max_value=2.0,
             value=st.session_state.token_weight,
             step=0.1,
             help="Voting weight for Token detector. Higher weight = more influence on final decision.",
-            key="token_weight_slider",
+            key="token_weight",  # Key matches session_state variable name
         )
 
         # AST weight slider
-        st.session_state.ast_weight = st.slider(
+        # FIX: Remove assignment that overwrites session_state
+        st.slider(
             "AST Weight",
             min_value=1.0,
             max_value=3.0,
             value=st.session_state.ast_weight,
             step=0.1,
             help="Voting weight for AST detector. AST is most reliable, so higher weight is recommended.",
-            key="ast_weight_slider",
+            key="ast_weight",  # Key matches session_state variable name
         )
 
-        # Hash weight slider
-        st.session_state.hash_weight = st.slider(
-            "Hash Weight",
-            min_value=0.5,
-            max_value=2.5,
-            value=st.session_state.hash_weight,
-            step=0.1,
-            help="Voting weight for Hash detector. Good for detecting scattered copying.",
-            key="hash_weight_slider",
-        )
+        # Hash weight slider (only show if hash detector is currently enabled)
+        # CRITICAL FIX: Check both hash_weight AND selected preset to prevent slider from re-enabling
+        is_simple_mode = "Simple" in st.session_state.selected_preset
+        if st.session_state.hash_weight > 0 and not is_simple_mode:
+            st.slider(
+                "Hash Weight",
+                min_value=0.5,
+                max_value=2.5,
+                value=st.session_state.hash_weight,
+                step=0.1,
+                help="Voting weight for Hash detector. Good for detecting scattered copying.",
+                key="hash_weight",  # Key matches session_state variable name
+            )
+        else:
+            # Hash disabled - show disabled slider with locked value
+            st.slider(
+                "Hash Weight",
+                min_value=0.0,
+                max_value=2.5,
+                value=0.0,
+                step=0.1,
+                disabled=True,
+                key="hash_weight_disabled",
+                help="Hash detector is disabled in Simple Problems mode (ineffective on files <50 lines)"
+            )
+            # CRITICAL: Ensure hash_weight stays at 0.0 in Simple mode
+            if is_simple_mode:
+                st.session_state.hash_weight = 0.0
 
     # ===== DECISION THRESHOLD =====
     st.sidebar.markdown("**Decision Threshold**")
     st.sidebar.caption("% of weighted votes needed to flag plagiarism")
 
-    st.session_state.decision_threshold = st.sidebar.slider(
+    # FIX: Remove assignment that overwrites session_state
+    st.sidebar.slider(
         "Plagiarism Decision Threshold",
         min_value=0.3,
         max_value=0.7,
@@ -684,19 +976,87 @@ def render_sidebar():
         step=0.05,
         help="Percentage of total weighted votes required to flag plagiarism. 0.50 = 50% of votes needed.",
         label_visibility="collapsed",
+        key="decision_threshold",  # Key matches session_state variable name
     )
 
     st.sidebar.markdown("---")
 
     # ===== RESET TO DEFAULTS BUTTON =====
-    if st.sidebar.button("🔄 Reset to Defaults", help="Reset all configuration to default values"):
-        st.session_state.token_threshold = 0.70
-        st.session_state.ast_threshold = 0.80
-        st.session_state.hash_threshold = 0.60
-        st.session_state.token_weight = 1.0
-        st.session_state.ast_weight = 2.0
-        st.session_state.hash_weight = 1.5
-        st.session_state.decision_threshold = 0.50
+    if st.sidebar.button("🔄 Reset to Defaults", help="Reset all configuration to current preset defaults"):
+        # Get current preset (determine which preset is currently selected)
+        preset_map = {
+            "Standard (Recommended)": "standard",
+            "Simple Problems (e.g., FizzBuzz)": "simple"
+        }
+        selected_preset_display = st.session_state.get('selected_preset', 'Standard (Recommended)')
+        preset_name = preset_map[selected_preset_display]
+
+        # Enhanced debug logging
+        logger.info("=" * 80)
+        logger.info(f"RESET BUTTON CLICKED - Preset: {preset_name}")
+        logger.info("=" * 80)
+
+        # Load preset default values
+        from src.core import get_preset
+        preset_config = get_preset(preset_name)
+
+        # Log current values before reset
+        logger.info("BEFORE RESET:")
+        logger.info(f"  Token Threshold: {st.session_state.token_threshold:.2f} → {preset_config['token']['threshold']:.2f}")
+        logger.info(f"  AST Threshold: {st.session_state.ast_threshold:.2f} → {preset_config['ast']['threshold']:.2f}")
+        logger.info(f"  Hash Threshold: {st.session_state.hash_threshold:.2f} → {preset_config['hash']['threshold']:.2f}")
+        logger.info(f"  Token Weight: {st.session_state.token_weight:.1f} → {preset_config['token']['weight']:.1f}")
+        logger.info(f"  AST Weight: {st.session_state.ast_weight:.1f} → {preset_config['ast']['weight']:.1f}")
+        logger.info(f"  Hash Weight: {st.session_state.hash_weight:.1f} → {preset_config['hash']['weight']:.1f}")
+        logger.info(f"  Decision Threshold: {st.session_state.decision_threshold:.2f} → {preset_config.get('decision_threshold', 0.50):.2f}")
+
+        # CRITICAL FIX: Delete all widget keys BEFORE setting new values
+        # This disconnects them from Streamlit widgets and prevents the
+        # "cannot be modified after widget instantiation" error
+        widget_keys = [
+            'token_threshold',
+            'ast_threshold',
+            'hash_threshold',
+            'token_weight',
+            'ast_weight',
+            'hash_weight',
+            'decision_threshold'
+        ]
+
+        logger.info("Deleting widget keys to allow reset...")
+        for key in widget_keys:
+            if key in st.session_state:
+                del st.session_state[key]
+                logger.debug(f"  Deleted key: {key}")
+
+        # Now safe to set new values (keys are disconnected from widgets)
+        st.session_state.token_threshold = preset_config['token']['threshold']
+        st.session_state.ast_threshold = preset_config['ast']['threshold']
+        st.session_state.hash_threshold = preset_config['hash']['threshold']
+
+        # Reset all weight values to preset defaults
+        st.session_state.token_weight = preset_config['token']['weight']
+        st.session_state.ast_weight = preset_config['ast']['weight']
+        st.session_state.hash_weight = preset_config['hash']['weight']
+
+        # Reset decision threshold (use percentage directly)
+        st.session_state.decision_threshold = preset_config.get('decision_threshold', 0.50)
+
+        # Log values after reset
+        logger.info("AFTER RESET:")
+        logger.info(f"  Token Threshold: {st.session_state.token_threshold:.2f}")
+        logger.info(f"  AST Threshold: {st.session_state.ast_threshold:.2f}")
+        logger.info(f"  Hash Threshold: {st.session_state.hash_threshold:.2f}")
+        logger.info(f"  Token Weight: {st.session_state.token_weight:.1f}")
+        logger.info(f"  AST Weight: {st.session_state.ast_weight:.1f}")
+        logger.info(f"  Hash Weight: {st.session_state.hash_weight:.1f}")
+        logger.info(f"  Decision Threshold: {st.session_state.decision_threshold:.2f}")
+        logger.info("=" * 80)
+
+        # Show success message
+        st.sidebar.success(f"✅ Reset to {preset_config['name']} defaults")
+
+        # Force UI refresh to update sliders
         st.rerun()
 
     st.sidebar.markdown("---")
@@ -706,12 +1066,18 @@ def render_sidebar():
         st.write("**Detection Thresholds:**")
         st.write(f"• Token: {st.session_state.token_threshold:.2f}")
         st.write(f"• AST: {st.session_state.ast_threshold:.2f}")
-        st.write(f"• Hash: {st.session_state.hash_threshold:.2f}")
+        if st.session_state.hash_weight > 0:
+            st.write(f"• Hash: {st.session_state.hash_threshold:.2f}")
+        else:
+            st.write(f"• Hash: DISABLED")
 
         st.write("\n**Voting Weights:**")
         st.write(f"• Token: {st.session_state.token_weight:.1f}x")
         st.write(f"• AST: {st.session_state.ast_weight:.1f}x")
-        st.write(f"• Hash: {st.session_state.hash_weight:.1f}x")
+        if st.session_state.hash_weight > 0:
+            st.write(f"• Hash: {st.session_state.hash_weight:.1f}x")
+        else:
+            st.write(f"• Hash: DISABLED (0.0x)")
 
         # Calculate total possible votes
         total_votes = (
@@ -729,19 +1095,32 @@ def render_sidebar():
         st.write(f"• Decision: Plagiarism if weighted votes ≥ {required_votes:.2f}")
 
     # ===== CONFIGURATION STATUS INDICATOR =====
-    # Show warning if non-default configuration
+    # Show warning if non-default configuration (compare against current preset)
+    preset_map = {
+        "Standard (Recommended)": "standard",
+        "Simple Problems (e.g., FizzBuzz)": "simple"
+    }
+    selected_preset_display = st.session_state.get('selected_preset', 'Standard (Recommended)')
+    preset_name = preset_map[selected_preset_display]
+
+    from src.core import get_preset
+    current_preset = get_preset(preset_name)
+
+    # Check if current values differ from preset defaults
+    expected_decision_threshold = current_preset.get('decision_threshold', 0.50)
+
     if (
-        st.session_state.token_threshold != 0.70
-        or st.session_state.ast_threshold != 0.80
-        or st.session_state.hash_threshold != 0.60
-        or st.session_state.token_weight != 1.0
-        or st.session_state.ast_weight != 2.0
-        or st.session_state.hash_weight != 1.5
-        or st.session_state.decision_threshold != 0.50
+        st.session_state.token_threshold != current_preset['token']['threshold']
+        or st.session_state.ast_threshold != current_preset['ast']['threshold']
+        or st.session_state.hash_threshold != current_preset['hash']['threshold']
+        or st.session_state.token_weight != current_preset['token']['weight']
+        or st.session_state.ast_weight != current_preset['ast']['weight']
+        or st.session_state.hash_weight != current_preset['hash']['weight']
+        or abs(st.session_state.decision_threshold - expected_decision_threshold) > 0.01
     ):
         st.sidebar.info("⚙️ Using custom configuration")
     else:
-        st.sidebar.success("✅ Using default configuration")
+        st.sidebar.success(f"✅ Using {current_preset['name']} defaults")
 
     st.sidebar.markdown("---")
 
@@ -762,11 +1141,29 @@ def render_sidebar():
         help="Display AST Detector structural similarity",
     )
 
-    st.session_state.show_hash_results = st.sidebar.checkbox(
-        "Show Hash Detector",
-        value=st.session_state.show_hash_results,
-        help="Display Hash Detector fingerprint similarity",
-    )
+    # CRITICAL FIX: Only show hash checkbox if hash detector is active
+    # In Simple Problems mode (hash_weight = 0.0), hash detector is disabled
+    if st.session_state.hash_weight > 0:
+        # BUG FIX: When hash is re-enabled (switching from Simple to Standard),
+        # restore show_hash_results to True if it was disabled
+        # This ensures hash columns reappear when switching back to Standard mode
+        if not st.session_state.show_hash_results:
+            st.session_state.show_hash_results = True
+
+        st.session_state.show_hash_results = st.sidebar.checkbox(
+            "Show Hash Detector",
+            value=st.session_state.show_hash_results,
+            help="Display Hash Detector fingerprint similarity",
+        )
+    else:
+        # Hash detector disabled - force checkbox to False and show disabled message
+        st.session_state.show_hash_results = False
+        st.sidebar.checkbox(
+            "Show Hash Detector",
+            value=False,
+            disabled=True,
+            help="Hash Detector is disabled in Simple Problems mode (ineffective on files <50 lines)",
+        )
 
     st.session_state.show_combined_score = st.sidebar.checkbox(
         "Show Combined Score",
@@ -1062,8 +1459,76 @@ def render_analysis_button(uploaded_files):
                 # Get threshold from session state
                 threshold = st.session_state.detector_threshold
 
-                # Run analysis
-                results_df = analyze_files(uploaded_files, threshold)
+                # Get preset configuration based on selected mode
+                preset_map = {
+                    "Standard (Recommended)": "standard",
+                    "Simple Problems (e.g., FizzBuzz)": "simple",
+                }
+                selected_preset_name = preset_map[st.session_state.selected_preset]
+
+                # Get preset configuration
+                config = get_preset_config(selected_preset_name)
+
+                # CRITICAL FIX: Override preset with sidebar threshold and weight values
+                # This ensures user's slider settings are used instead of preset defaults
+                config['token']['threshold'] = st.session_state.token_threshold
+                config['token']['weight'] = st.session_state.token_weight
+                config['ast']['threshold'] = st.session_state.ast_threshold
+                config['ast']['weight'] = st.session_state.ast_weight
+                config['hash']['threshold'] = st.session_state.hash_threshold
+                config['hash']['weight'] = st.session_state.hash_weight
+                config['decision_threshold'] = st.session_state.decision_threshold
+
+                # Log the configuration being used
+                logger.info("=" * 80)
+                logger.info(f"STARTING PLAGIARISM DETECTION")
+                logger.info(f"Selected preset: {selected_preset_name}")
+                logger.info(f"Configuration after sidebar override:")
+                logger.info(f"  Token: threshold={config['token']['threshold']:.2f}, weight={config['token']['weight']:.1f}")
+                logger.info(f"  AST: threshold={config['ast']['threshold']:.2f}, weight={config['ast']['weight']:.1f}")
+                logger.info(f"  Hash: threshold={config['hash']['threshold']:.2f}, weight={config['hash']['weight']:.1f}")
+                logger.info(f"  Decision threshold: {config['decision_threshold']:.2f}")
+                logger.info(f"Hash detector status: {'ACTIVE' if config['hash']['weight'] > 0 else 'DISABLED (weight=0.0)'}")
+                logger.info("=" * 80)
+
+                # Show configuration debug info in UI
+                with st.expander("🔍 Debug: Configuration Used", expanded=True):
+                    st.markdown("**Session State Values (from sliders):**")
+                    st.code(f"""
+Token Threshold: {st.session_state.token_threshold:.2f}
+Token Weight: {st.session_state.token_weight:.1f}
+AST Threshold: {st.session_state.ast_threshold:.2f}
+AST Weight: {st.session_state.ast_weight:.1f}
+Hash Threshold: {st.session_state.hash_threshold:.2f}
+Hash Weight: {st.session_state.hash_weight:.1f}
+Decision Threshold: {st.session_state.decision_threshold:.2f}
+                    """)
+
+                    st.markdown("**Config Object (passed to VotingSystem):**")
+                    st.code(f"""
+Preset: {selected_preset_name}
+
+Token Detector:
+  - Threshold: {config['token']['threshold']:.2f}
+  - Weight: {config['token']['weight']:.1f}
+
+AST Detector:
+  - Threshold: {config['ast']['threshold']:.2f}
+  - Weight: {config['ast']['weight']:.1f}
+
+Hash Detector:
+  - Threshold: {config['hash']['threshold']:.2f}
+  - Weight: {config['hash']['weight']:.1f}
+  - Status: {"ACTIVE" if config['hash']['weight'] > 0 else "DISABLED (weight=0.0)"}
+
+Voting Configuration:
+  - Total Possible Votes: {config['token']['weight'] + config['ast']['weight'] + config['hash']['weight']:.1f}
+  - Decision Threshold: {config['decision_threshold']:.2f} ({config['decision_threshold']*100:.0f}%)
+  - Required Votes: {(config['token']['weight'] + config['ast']['weight'] + config['hash']['weight']) * config['decision_threshold']:.2f}
+                    """)
+
+                # Run analysis with preset configuration
+                results_df = analyze_files(uploaded_files, threshold, config=config)
 
                 # Store results in session state
                 st.session_state.analysis_results = results_df
@@ -1075,19 +1540,19 @@ def render_analysis_button(uploaded_files):
                     try:
                         job_id = save_analysis_to_database(uploaded_files, results_df, threshold)
                         st.session_state.current_job_id = job_id
-                        st.success(f"✓ Analysis completed! Job ID: {job_id}")
+                        st.success(f"Analysis completed! Job ID: {job_id}")
                     except Exception as e:
                         st.error(f"Failed to save to database: {e}")
                         st.warning(
                             "Results are still available in this session, but won't be saved to history."
                         )
-                        st.success("✓ Analysis completed successfully!")
+                        st.success("Analysis completed successfully!")
 
                 # Professional completion notification
                 st.success("Analysis Complete - Results ready for review")
 
             except Exception as e:
-                st.error(f"❌ Error during analysis: {str(e)}")
+                st.error(f"Error during analysis: {str(e)}")
                 st.exception(e)
 
 
@@ -1096,6 +1561,7 @@ def render_results():
     Render analysis results section with voting system results.
 
     Displays:
+        - Preset indicator showing which mode was used
         - Summary metrics for all detectors and voting system
         - Confidence distribution
         - Detector agreement metrics
@@ -1107,42 +1573,94 @@ def render_results():
         return
 
     st.markdown("---")
-    st.header("Analysis Results - Voting System")
+
+    # Display which preset was used
+    col1, col2 = st.columns([3, 1])
+
+    with col1:
+        st.header("Analysis Results")
+
+    with col2:
+        # Show preset badge
+        preset_name = st.session_state.get("selected_preset", "Standard (Recommended)")
+        if "Simple" in preset_name:
+            st.info("Simple Mode")
+        else:
+            st.success("Standard Mode")
+
+    # If Simple mode, show hash disabled warning
+    if "Simple" in st.session_state.get("selected_preset", ""):
+        st.warning(
+            "Hash detector disabled in Simple Problems mode (ineffective on files <50 lines)"
+        )
+        st.caption(
+            "AST threshold increased to 0.85 to reduce false positives on constrained problems."
+        )
 
     df = st.session_state.analysis_results
+
+    # Check if hash detector is active
+    hash_is_active = st.session_state.hash_weight > 0
 
     # Summary metrics - Show average for each detector
     st.subheader("Detector Performance Summary")
 
-    col1, col2, col3, col4 = st.columns(4)
+    # CRITICAL FIX: Conditional layout based on whether hash is active
+    if hash_is_active:
+        # Show all 4 metrics (Token, AST, Hash, Confidence)
+        col1, col2, col3, col4 = st.columns(4)
 
-    with col1:
-        st.metric(
-            label="Avg Token Similarity",
-            value=f"{df['Token Similarity (%)'].mean():.1f}%",
-            help="Average Token Detector similarity (Jaccard + Cosine)",
-        )
+        with col1:
+            st.metric(
+                label="Avg Token Similarity",
+                value=f"{df['Token Similarity (%)'].mean():.1f}%",
+                help="Average Token Detector similarity (Jaccard + Cosine)",
+            )
 
-    with col2:
-        st.metric(
-            label="Avg AST Similarity",
-            value=f"{df['AST Similarity (%)'].mean():.1f}%",
-            help="Average structural similarity from AST analysis",
-        )
+        with col2:
+            st.metric(
+                label="Avg AST Similarity",
+                value=f"{df['AST Similarity (%)'].mean():.1f}%",
+                help="Average structural similarity from AST analysis",
+            )
 
-    with col3:
-        st.metric(
-            label="Avg Hash Similarity",
-            value=f"{df['Hash Similarity (%)'].mean():.1f}%",
-            help="Average fingerprint similarity from Winnowing",
-        )
+        with col3:
+            st.metric(
+                label="Avg Hash Similarity",
+                value=f"{df['Hash Similarity (%)'].mean():.1f}%",
+                help="Average fingerprint similarity from Winnowing",
+            )
 
-    with col4:
-        st.metric(
-            label="Avg Confidence",
-            value=f"{df['confidence_score'].mean():.2%}",
-            help="Average confidence score from voting system",
-        )
+        with col4:
+            st.metric(
+                label="Avg Confidence",
+                value=f"{df['confidence_score'].mean():.2%}",
+                help="Average confidence score from voting system",
+            )
+    else:
+        # Hash disabled - only show 3 metrics (Token, AST, Confidence)
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.metric(
+                label="Avg Token Similarity",
+                value=f"{df['Token Similarity (%)'].mean():.1f}%",
+                help="Average Token Detector similarity (Jaccard + Cosine)",
+            )
+
+        with col2:
+            st.metric(
+                label="Avg AST Similarity",
+                value=f"{df['AST Similarity (%)'].mean():.1f}%",
+                help="Average structural similarity from AST analysis",
+            )
+
+        with col3:
+            st.metric(
+                label="Avg Confidence",
+                value=f"{df['confidence_score'].mean():.2%}",
+                help="Average confidence score from voting system (Token + AST only)",
+            )
 
     st.markdown("---")
 
@@ -1190,50 +1708,96 @@ def render_results():
     # Detector Agreement Metrics
     st.subheader("Detector Agreement")
 
-    # Calculate agreement (all 3 vote same way)
-    def check_unanimous(row):
-        votes = [row["token_vote"], row["ast_vote"], row["hash_vote"]]
-        return all(votes) or not any(votes)
+    # CRITICAL FIX: Calculate agreement based on ACTIVE detectors only
+    # In Simple mode, only Token and AST vote (hash is disabled)
+    if hash_is_active:
+        # All 3 detectors active - check if all 3 agree
+        def check_unanimous(row):
+            votes = [row["token_vote"], row["ast_vote"], row["hash_vote"]]
+            return all(votes) or not any(votes)
 
-    df["unanimous"] = df.apply(check_unanimous, axis=1)
-    agreement_rate = df["unanimous"].sum() / len(df) * 100 if len(df) > 0 else 0
+        df["unanimous"] = df.apply(check_unanimous, axis=1)
+        agreement_rate = df["unanimous"].sum() / len(df) * 100 if len(df) > 0 else 0
+        agreement_label = "3-Detector Agreement"
+        agreement_help = "Percentage of pairs where all 3 detectors agree (all vote yes or all vote no)"
+    else:
+        # Only Token and AST active - check if both agree
+        def check_unanimous(row):
+            votes = [row["token_vote"], row["ast_vote"]]
+            return all(votes) or not any(votes)
 
-    col1, col2, col3 = st.columns(3)
+        df["unanimous"] = df.apply(check_unanimous, axis=1)
+        agreement_rate = df["unanimous"].sum() / len(df) * 100 if len(df) > 0 else 0
+        agreement_label = "2-Detector Agreement"
+        agreement_help = "Percentage of pairs where Token and AST detectors agree (both vote yes or both vote no)"
 
-    with col1:
-        st.metric(
-            label=" Detector Agreement",
-            value=f"{agreement_rate:.1f}%",
-            help="Percentage of pairs where all detectors agree (all vote yes or all vote no)",
-        )
+    # CRITICAL FIX: Conditional layout based on whether hash is active
+    if hash_is_active:
+        # Show all 3 detector vote counts
+        col1, col2, col3 = st.columns(3)
 
-    with col2:
-        vote_counts = df[["token_vote", "ast_vote", "hash_vote"]].sum()
-        st.metric(
-            label="Token Votes",
-            value=f"{vote_counts['token_vote']}/{total_pairs}",
-            help="Pairs where Token detector voted for plagiarism",
-        )
+        with col1:
+            st.metric(
+                label=agreement_label,
+                value=f"{agreement_rate:.1f}%",
+                help=agreement_help,
+            )
 
-    with col3:
-        col3a, col3b = st.columns(2)
-        with col3a:
+        with col2:
+            vote_counts = df[["token_vote", "ast_vote", "hash_vote"]].sum()
+            st.metric(
+                label="Token Votes",
+                value=f"{int(vote_counts['token_vote'])}/{total_pairs}",
+                help="Pairs where Token detector voted for plagiarism",
+            )
+
+        with col3:
+            col3a, col3b = st.columns(2)
+            with col3a:
+                st.metric(
+                    label="AST Votes",
+                    value=f"{int(vote_counts['ast_vote'])}/{total_pairs}",
+                    help="Pairs where AST detector voted for plagiarism",
+                )
+            with col3b:
+                st.metric(
+                    label="Hash Votes",
+                    value=f"{int(vote_counts['hash_vote'])}/{total_pairs}",
+                    help="Pairs where Hash detector voted for plagiarism",
+                )
+    else:
+        # Hash disabled - only show Token and AST vote counts
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.metric(
+                label=agreement_label,
+                value=f"{agreement_rate:.1f}%",
+                help=agreement_help,
+            )
+
+        with col2:
+            vote_counts = df[["token_vote", "ast_vote"]].sum()
+            st.metric(
+                label="Token Votes",
+                value=f"{int(vote_counts['token_vote'])}/{total_pairs}",
+                help="Pairs where Token detector voted for plagiarism",
+            )
+
+        with col3:
             st.metric(
                 label="AST Votes",
-                value=f"{vote_counts['ast_vote']}/{total_pairs}",
+                value=f"{int(vote_counts['ast_vote'])}/{total_pairs}",
                 help="Pairs where AST detector voted for plagiarism",
-            )
-        with col3b:
-            st.metric(
-                label="Hash Votes",
-                value=f"{vote_counts['hash_vote']}/{total_pairs}",
-                help="Pairs where Hash detector voted for plagiarism",
             )
 
     st.markdown("---")
 
     # Results table with filtering
     st.subheader("Detailed Results by Detector")
+
+    # Check if hash detector is active (weight > 0)
+    hash_is_active = st.session_state.hash_weight > 0
 
     # Create display dataframe based on filters
     display_df = df[["File 1", "File 2"]].copy()
@@ -1249,7 +1813,9 @@ def render_results():
         display_df["AST (%)"] = df["AST Similarity (%)"].map("{:.2f}".format)
         display_df["AST Verdict"] = df["AST Verdict"]
 
-    if st.session_state.show_hash_results:
+    # CRITICAL FIX: Only show hash columns if hash detector is ACTIVE (weight > 0)
+    # In Simple Problems mode, hash_weight = 0.0, so hash columns should be hidden
+    if st.session_state.show_hash_results and hash_is_active:
         display_df["Hash (%)"] = df["Hash Similarity (%)"].map("{:.2f}".format)
         display_df["Hash Verdict"] = df["Hash Verdict"]
 
@@ -1284,7 +1850,8 @@ def render_results():
             }
         )
 
-    if st.session_state.show_hash_results:
+    # CRITICAL FIX: Only show hash column config if hash detector is ACTIVE
+    if st.session_state.show_hash_results and hash_is_active:
         column_config.update(
             {
                 "Hash (%)": st.column_config.TextColumn("Hash %", width="small"),
@@ -1339,12 +1906,17 @@ def render_results():
                         f"{ast_color} **AST**: {row['ast_similarity']:.2%} | {ast_vote_icon} (threshold: {st.session_state.ast_threshold:.2f})"
                     )
 
-                    # Hash detector
-                    hash_vote_icon = "✓ VOTE" if row["hash_vote"] else "✗ NO VOTE"
-                    hash_color = "🟢" if row["hash_vote"] else "🔴"
-                    st.markdown(
-                        f"{hash_color} **Hash**: {row['hash_similarity']:.2%} | {hash_vote_icon} (threshold: {st.session_state.hash_threshold:.2f})"
-                    )
+                    # CRITICAL FIX: Only show hash detector if it's active
+                    if hash_is_active:
+                        # Hash detector
+                        hash_vote_icon = "✓ VOTE" if row["hash_vote"] else "✗ NO VOTE"
+                        hash_color = "🟢" if row["hash_vote"] else "🔴"
+                        st.markdown(
+                            f"{hash_color} **Hash**: {row['hash_similarity']:.2%} | {hash_vote_icon} (threshold: {st.session_state.hash_threshold:.2f})"
+                        )
+                    else:
+                        # Hash disabled in Simple Problems mode
+                        st.markdown("⏭️ **Hash**: Disabled in Simple Problems mode")
 
                 with col2:
                     st.markdown("**Voting Summary:**")
@@ -1373,10 +1945,14 @@ def render_results():
                         f"- AST: {st.session_state.ast_weight:.1f}x "
                         + ("(counted)" if row["ast_vote"] else "")
                     )
-                    st.markdown(
-                        f"- Hash: {st.session_state.hash_weight:.1f}x "
-                        + ("(counted)" if row["hash_vote"] else "")
-                    )
+                    # CRITICAL FIX: Only show hash weight if hash detector is active
+                    if hash_is_active:
+                        st.markdown(
+                            f"- Hash: {st.session_state.hash_weight:.1f}x "
+                            + ("(counted)" if row["hash_vote"] else "")
+                        )
+                    else:
+                        st.markdown("- Hash: 0.0x (disabled)")
 
     # Export Results - CSV Only
     st.markdown("---")
@@ -1513,6 +2089,35 @@ def render_how_it_works():
     CodeGuard uses a **multi-detector voting system** to identify potential plagiarism.
     Three complementary algorithms analyze your code, each looking for different types of similarity.
     Their results are combined through a weighted voting mechanism for accurate detection.
+    """
+    )
+
+    st.markdown("---")
+
+    # Detection Modes Section
+    st.subheader("Detection Modes")
+    st.markdown(
+        """
+CodeGuard offers two detection modes optimized for different types of assignments:
+
+**Standard Mode (Recommended):**
+- Use for typical programming assignments (50+ lines)
+- Examples: Rock-Paper-Scissors, data structures, games, algorithms
+- All three detectors active (Token, AST, Hash)
+- Proven 100% precision and recall on realistic code
+- Hash detector uses Winnowing algorithm for partial match detection
+
+**Simple Problems Mode:**
+- Use for short, constrained problems (<50 lines)
+- Examples: FizzBuzz, factorial calculator, palindrome checker
+- Hash detector automatically disabled (ineffective and slow on small files)
+- AST threshold increased (0.80 to 0.85) to reduce false positives
+- Optimized for problems with limited solution space
+
+**How to choose:**
+- If average file size > 50 lines: Use **Standard Mode**
+- If average file size < 50 lines: Use **Simple Problems Mode**
+- When in doubt: Use **Standard Mode** (default)
     """
     )
 
