@@ -113,9 +113,9 @@ def initialize_session_state():
 
     # Initialize preset selection (default to Standard)
     if "selected_preset" not in st.session_state:
-        st.session_state.selected_preset = "Standard (Recommended)"
+        st.session_state.selected_preset = "Standard ( files > 50 lines)"
     if "previous_preset" not in st.session_state:
-        st.session_state.previous_preset = "Standard (Recommended)"
+        st.session_state.previous_preset = "Standard ( files > 50 lines)"
 
     # Initialize voting system configuration from preset
     # This ensures initial values match the selected preset
@@ -123,8 +123,8 @@ def initialize_session_state():
         from src.core import get_preset
         # Get the preset based on the selected preset
         preset_map = {
-            "Standard (Recommended)": "standard",
-            "Simple Problems (e.g., FizzBuzz)": "simple"
+            "Standard ( files > 50 lines)": "standard",
+            "Simple (file < 50 lines)": "simple"
         }
         preset_name = preset_map.get(st.session_state.selected_preset, "standard")
         preset_config = get_preset(preset_name)
@@ -558,137 +558,7 @@ def save_analysis_to_database(uploaded_files, results_df: pd.DataFrame, threshol
     return job_id
 
 
-# ============================================================================
-# JSON EXPORT
-# ============================================================================
-
-
-def create_download_json(
-    df: pd.DataFrame, threshold: float, file_count: int, job_id: Optional[str] = None
-) -> str:
-    """
-    Create JSON string for download with all detector results and voting information.
-
-    Args:
-        df: DataFrame with analysis results from all detectors and voting system
-        threshold: Threshold used for detection (legacy parameter, not used)
-        file_count: Number of files analyzed
-        job_id: Optional job identifier
-
-    Returns:
-        str: JSON-formatted string ready for download
-
-    JSON structure includes:
-        - job_id: Job identifier (if provided)
-        - analysis_date: ISO timestamp
-        - file_count: Number of files analyzed
-        - pair_count: Number of pairs compared
-        - voting_system: Voting system configuration
-        - detector_thresholds: Thresholds for each detector
-        - results: List of comparison results with voting information
-        - summary: Aggregate statistics including voting metrics
-    """
-    # Convert DataFrame to list of dictionaries with voting information
-    results_list = []
-    for _, row in df.iterrows():
-        results_list.append(
-            {
-                "file1": row["File 1"],
-                "file2": row["File 2"],
-                # Detector scores
-                "token_similarity": row["token_similarity"],
-                "token_jaccard": row["token_jaccard"],
-                "token_cosine": row["token_cosine"],
-                "ast_similarity": row["ast_similarity"],
-                "hash_similarity": row["hash_similarity"],
-                # Voting results
-                "plagiarism_detected": bool(row["plagiarism_detected"]),
-                "confidence_score": row["confidence_score"],
-                "confidence_level": row["confidence_level"],
-                "weighted_votes": row["weighted_votes"],
-                "individual_votes": {
-                    "token": bool(row["token_vote"]),
-                    "ast": bool(row["ast_vote"]),
-                    "hash": bool(row["hash_vote"]),
-                },
-                # Verdicts
-                "token_verdict": row["Token Verdict"],
-                "ast_verdict": row["AST Verdict"],
-                "hash_verdict": row["Hash Verdict"],
-                "overall_status": row["Overall Status"],
-            }
-        )
-
-    # Calculate summary statistics
-    total_pairs = len(df)
-    plagiarized_pairs = df["plagiarism_detected"].sum()
-    clean_pairs = total_pairs - plagiarized_pairs
-
-    # Confidence level distribution
-    confidence_distribution = df["confidence_level"].value_counts().to_dict()
-
-    # Get current configuration from session state
-    token_weight = st.session_state.get("token_weight", 1.0)
-    ast_weight = st.session_state.get("ast_weight", 2.0)
-    hash_weight = st.session_state.get("hash_weight", 1.5)
-    decision_threshold = st.session_state.get("decision_threshold", 0.50)
-    total_possible_votes = token_weight + ast_weight + hash_weight
-    required_votes = total_possible_votes * decision_threshold
-
-    # Create export data structure with voting system information
-    export_data = {
-        "analysis_date": datetime.now().isoformat(),
-        "file_count": file_count,
-        "pair_count": total_pairs,
-        "voting_system": {
-            "detector_weights": {"token": token_weight, "ast": ast_weight, "hash": hash_weight},
-            "total_possible_votes": total_possible_votes,
-            "decision_threshold": required_votes,
-            "decision_threshold_percentage": decision_threshold * 100,
-        },
-        "detector_thresholds": {
-            "token": st.session_state.get("token_threshold", TOKEN_THRESHOLD),
-            "ast": st.session_state.get("ast_threshold", AST_THRESHOLD),
-            "hash": st.session_state.get("hash_threshold", HASH_THRESHOLD),
-        },
-        "hash_parameters": {"k": HASH_K_GRAM, "w": HASH_WINDOW},
-        "results": results_list,
-        "summary": {
-            "total_pairs": total_pairs,
-            "plagiarized_pairs": int(plagiarized_pairs),
-            "clean_pairs": int(clean_pairs),
-            "average_confidence": float(df["confidence_score"].mean()),
-            "confidence_distribution": confidence_distribution,
-            "average_similarity_scores": {
-                "token": float(df["token_similarity"].mean()),
-                "ast": float(df["ast_similarity"].mean()),
-                "hash": float(df["hash_similarity"].mean()),
-            },
-            "vote_counts": {
-                "token": int(df["token_vote"].sum()),
-                "ast": int(df["ast_vote"].sum()),
-                "hash": int(df["hash_vote"].sum()),
-            },
-            "detector_agreement_rate": float(
-                df.apply(
-                    lambda row: all([row["token_vote"], row["ast_vote"], row["hash_vote"]])
-                    or not any([row["token_vote"], row["ast_vote"], row["hash_vote"]]),
-                    axis=1,
-                ).sum()
-                / total_pairs
-                * 100
-            )
-            if total_pairs > 0
-            else 0.0,
-        },
-    }
-
-    # Add job_id if provided
-    if job_id:
-        export_data["job_id"] = job_id
-
-    # Convert to JSON string with indentation for readability
-    return json.dumps(export_data, indent=2)
+# JSON EXPORT FUNCTIONALITY REMOVED - CSV export is now the primary export format
 
 
 # ============================================================================
@@ -720,17 +590,17 @@ def render_sidebar():
     # Use key parameter to bind radio button directly to session state
     detection_mode = st.sidebar.radio(
         "Detection Mode",
-        options=["Standard (Recommended)", "Simple Problems (e.g., FizzBuzz)"],
-        index=0 if st.session_state.selected_preset == "Standard (Recommended)" else 1,
+        options=["Standard ( files > 50 lines)", "Simple (file < 50 lines)"],
+        index=0,  # Default to Standard mode
         key="selected_preset",  # CRITICAL: Bind directly to session state
         help="""
-**Standard Mode (Recommended):**
+**Standard Mode:**
 - For typical assignments (50+ lines)
 - Games, data structures, algorithms
 - Uses all three detectors (Token, AST, Hash)
 - 100% precision on realistic code
 
-**Simple Problems Mode:**
+**Simple Mode:**
 - For short assignments (<50 lines)
 - FizzBuzz, factorial, palindrome checks
 - Hash detector DISABLED (ineffective on small files)
@@ -745,8 +615,8 @@ def render_sidebar():
 
         # Get new preset configuration
         preset_map = {
-            "Standard (Recommended)": "standard",
-            "Simple Problems (e.g., FizzBuzz)": "simple",
+            "Standard ( files > 50 lines)": "standard",
+            "Simple (file < 50 lines)": "simple",
         }
         new_preset_name = preset_map[st.session_state.selected_preset]
 
@@ -800,8 +670,8 @@ def render_sidebar():
 
         # Map display name to preset name
         preset_map = {
-            "Standard (Recommended)": "standard",
-            "Simple Problems (e.g., FizzBuzz)": "simple",
+            "Standard ( files > 50 lines)": "standard",
+            "Simple (file < 50 lines)": "simple",
         }
         preset_name = preset_map[detection_mode]
 
@@ -898,8 +768,8 @@ Confidence: {preset_config['hash']['confidence_weight']}"""
             if 'hash_threshold' not in st.session_state:
                 from src.core import get_preset
                 preset_map = {
-                    "Standard (Recommended)": "standard",
-                    "Simple Problems (e.g., FizzBuzz)": "simple"
+                    "Standard ( files > 50 lines)": "standard",
+                    "Simple (file < 50 lines)": "simple"
                 }
                 preset_name = preset_map.get(st.session_state.selected_preset, "standard")
                 preset_config = get_preset(preset_name)
@@ -985,10 +855,10 @@ Confidence: {preset_config['hash']['confidence_weight']}"""
     if st.sidebar.button("🔄 Reset to Defaults", help="Reset all configuration to current preset defaults"):
         # Get current preset (determine which preset is currently selected)
         preset_map = {
-            "Standard (Recommended)": "standard",
-            "Simple Problems (e.g., FizzBuzz)": "simple"
+            "Standard ( files > 50 lines)": "standard",
+            "Simple (file < 50 lines)": "simple"
         }
-        selected_preset_display = st.session_state.get('selected_preset', 'Standard (Recommended)')
+        selected_preset_display = st.session_state.get('selected_preset', 'Standard ( files > 50 lines)')
         preset_name = preset_map[selected_preset_display]
 
         # Enhanced debug logging
@@ -1097,10 +967,10 @@ Confidence: {preset_config['hash']['confidence_weight']}"""
     # ===== CONFIGURATION STATUS INDICATOR =====
     # Show warning if non-default configuration (compare against current preset)
     preset_map = {
-        "Standard (Recommended)": "standard",
-        "Simple Problems (e.g., FizzBuzz)": "simple"
+        "Standard ( files > 50 lines)": "standard",
+        "Simple (file < 50 lines)": "simple"
     }
-    selected_preset_display = st.session_state.get('selected_preset', 'Standard (Recommended)')
+    selected_preset_display = st.session_state.get('selected_preset', 'Standard ( files > 50 lines)')
     preset_name = preset_map[selected_preset_display]
 
     from src.core import get_preset
@@ -1118,9 +988,9 @@ Confidence: {preset_config['hash']['confidence_weight']}"""
         or st.session_state.hash_weight != current_preset['hash']['weight']
         or abs(st.session_state.decision_threshold - expected_decision_threshold) > 0.01
     ):
-        st.sidebar.info("⚙️ Using custom configuration")
+        st.sidebar.info(" Using custom configuration")
     else:
-        st.sidebar.success(f"✅ Using {current_preset['name']} defaults")
+        st.sidebar.success(f" Using {current_preset['name']} defaults")
 
     st.sidebar.markdown("---")
 
@@ -1193,8 +1063,7 @@ Confidence: {preset_config['hash']['confidence_weight']}"""
     2. Toggle detection method filters
     3. Click 'Analyze for Plagiarism'
     4. Review results from all detectors
-    5. Download comprehensive JSON report
-    6. View past analyses in History tab
+    5. View past analyses in History tab
     """
     )
 
@@ -1434,12 +1303,6 @@ def render_file_upload():
         - **File type:** Python (.py)
         - **Max file size:** 16MB
 
-        ### How It Works
-        1. **Tokenization**: Code is broken down into semantic tokens
-        2. **Jaccard Similarity**: Measures unique token overlap
-        3. **Cosine Similarity**: Measures token frequency similarity
-        4. **Combined Score**: Average of both metrics
-        5. **Detection**: Flagged as plagiarism if score ≥ threshold
         """
         )
 
@@ -1461,8 +1324,8 @@ def render_analysis_button(uploaded_files):
 
                 # Get preset configuration based on selected mode
                 preset_map = {
-                    "Standard (Recommended)": "standard",
-                    "Simple Problems (e.g., FizzBuzz)": "simple",
+                    "Standard ( files > 50 lines)": "standard",
+                    "Simple (file < 50 lines)": "simple",
                 }
                 selected_preset_name = preset_map[st.session_state.selected_preset]
 
@@ -1582,7 +1445,7 @@ def render_results():
 
     with col2:
         # Show preset badge
-        preset_name = st.session_state.get("selected_preset", "Standard (Recommended)")
+        preset_name = st.session_state.get("selected_preset", "Standard ( files > 50 lines)")
         if "Simple" in preset_name:
             st.info("Simple Mode")
         else:
@@ -2327,25 +2190,7 @@ def render_job_details(job_id: str):
     else:
         st.success("✅ No plagiarism detected in any pairs")
 
-    # Export button
-    st.markdown("---")
-    st.subheader("Export Results")
-
-    json_data = create_download_json(
-        df,
-        0.7,  # Default threshold (actual threshold not stored in current implementation)
-        summary["file_count"],
-        job_id,
-    )
-
-    st.download_button(
-        label="Download Results (JSON)",
-        data=json_data,
-        file_name=f"{job_id}_results.json",
-        mime="application/json",
-        help="Download analysis results in JSON format",
-        use_container_width=True,
-    )
+    # CSV Export is handled in the "Analysis" tab display_plagiarism_results function
 
 
 # ============================================================================
